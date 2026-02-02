@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finanzas Hub | Deep Purple</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { background-color: #0f051a; color: white; }
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: rgba(255, 255, 255, 0.1); }
+        .calendar-day { background: #1a0b2e; height: 100px; padding: 8px; transition: all 0.2s; }
+        .calendar-day:hover { background: #2d1250; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const App = () => {
+            const [view, setView] = useState('dashboard');
+            const [user, setUser] = useState(localStorage.getItem('userName') || '');
+            const [expenses, setExpenses] = useState(JSON.parse(localStorage.getItem('expenses')) || []);
+            const [paymentType, setPaymentType] = useState('debito');
+
+            useEffect(() => {
+                localStorage.setItem('expenses', JSON.stringify(expenses));
+            }, [expenses]);
+
+            const addExpense = (e) => {
+                e.preventDefault();
+                const data = new FormData(e.target);
+                const amount = parseFloat(data.get('amount'));
+                const inst = paymentType === 'credito' ? parseInt(data.get('installments')) : 1;
+                
+                const newItems = Array.from({ length: inst }, (_, i) => {
+                    const date = new Date();
+                    date.setMonth(date.getMonth() + i);
+                    return {
+                        id: Math.random().toString(36).substr(2, 9),
+                        desc: inst > 1 ? `${data.get('desc')} (Cuota ${i+1}/${inst})` : data.get('desc'),
+                        amount: amount / inst,
+                        date: date.toISOString().split('T')[0],
+                        type: paymentType,
+                        paid: paymentType === 'debito'
+                    };
+                });
+                setExpenses([...expenses, ...newItems]);
+                e.target.reset();
+                setPaymentType('debito');
+            };
+
+            // Pantalla de Bienvenida
+            if (!user) {
+                return (
+                    <div className="h-screen flex items-center justify-center bg-gradient-to-br from-[#1a0b2e] to-[#4c1d95]">
+                        <div className="glass p-12 rounded-[3rem] text-center max-w-sm w-full">
+                            <h1 className="text-4xl font-black mb-6 tracking-tighter italic">FINANZAS<span className="text-fuchsia-500">PRO</span></h1>
+                            <input id="nameInput" type="text" placeholder="Tu nombre..." className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 mb-4 outline-none focus:ring-2 ring-fuchsia-500" />
+                            <button onClick={() => {
+                                const val = document.getElementById('nameInput').value;
+                                if(val) { setUser(val); localStorage.setItem('userName', val); }
+                            }} className="w-full bg-fuchsia-600 py-4 rounded-2xl font-bold shadow-lg shadow-fuchsia-500/20">ENTRAR</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen pb-20">
+                    <header className="p-8 flex justify-between items-center">
+                        <div>
+                            <h2 className="text-white/40 text-xs font-bold uppercase tracking-widest">Bienvenido de nuevo</h2>
+                            <h1 className="text-3xl font-black italic">{user.toUpperCase()}</h1>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => setView('dashboard')} className={`p-4 rounded-2xl transition-all ${view === 'dashboard' ? 'bg-fuchsia-600' : 'glass'}`}>Dashboard</button>
+                            <button onClick={() => setView('calendar')} className={`p-4 rounded-2xl transition-all ${view === 'calendar' ? 'bg-fuchsia-600' : 'glass'}`}>Calendario</button>
+                        </div>
+                    </header>
+
+                    <main className="px-8 max-w-6xl mx-auto">
+                        {view === 'dashboard' ? (
+                            <div className="space-y-8 animate-in fade-in duration-500">
+                                {/* Dashboard Stats */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="glass p-8 rounded-[2.5rem] bg-gradient-to-br from-fuchsia-600/20 to-transparent">
+                                        <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">Gasto Total</p>
+                                        <h3 className="text-4xl font-black mt-2">${expenses.reduce((a,b) => a+b.amount, 0).toLocaleString()}</h3>
+                                    </div>
+                                    <div className="glass p-8 rounded-[2.5rem] bg-gradient-to-br from-indigo-600/20 to-transparent">
+                                        <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">Deuda Cuotas</p>
+                                        <h3 className="text-4xl font-black mt-2">${expenses.filter(e => e.type === 'credito').reduce((a,b) => a+b.amount, 0).toLocaleString()}</h3>
+                                    </div>
+                                    <div className="glass p-8 rounded-[2.5rem] bg-gradient-to-br from-emerald-600/20 to-transparent">
+                                        <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">Ahorro Activo</p>
+                                        <h3 className="text-4xl font-black mt-2">$0</h3>
+                                    </div>
+                                </div>
+
+                                {/* Formulario de Gastos */}
+                                <div className="glass p-10 rounded-[3rem]">
+                                    <h2 className="text-2xl font-black mb-6 italic text-fuchsia-500 underline decoration-indigo-500 underline-offset-8">Registrar Movimiento</h2>
+                                    <form onSubmit={addExpense} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <input name="desc" placeholder="Descripción (ej: Supermercado)" className="w-full bg-white/5 border border-white/10 p-4 rounded-xl outline-none focus:ring-2 ring-fuchsia-500" required />
+                                        <input name="amount" type="number" placeholder="Monto ($)" className="w-full bg-white/5 border border-white/10 p-4 rounded-xl outline-none focus:ring-2 ring-fuchsia-500" required />
+                                        <select value={paymentType} onChange={(e) => setPaymentType(e.target.value)} className="w-full bg-[#1a0b2e] border border-white/10 p-4 rounded-xl outline-none">
+                                            <option value="debito">Débito</option>
+                                            <option value="credito">Crédito</option>
+                                        </select>
+                                        {paymentType === 'credito' && (
+                                            <input name="installments" type="number" placeholder="N° de cuotas" className="w-full bg-white/10 border border-fuchsia-500/30 p-4 rounded-xl outline-none focus:ring-2 ring-fuchsia-500" required />
+                                        )}
+                                        <button type="submit" className="md:col-span-2 bg-white text-black font-black py-4 rounded-xl hover:bg-fuchsia-500 hover:text-white transition-all">GUARDAR TRANSACCIÓN</button>
+                                    </form>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="animate-in fade-in duration-500">
+                                <div className="glass rounded-[2.5rem] overflow-hidden">
+                                    <div className="p-8 border-b border-white/10 flex justify-between items-center bg-white/5">
+                                        <h2 className="text-3xl font-black italic">Mi Agenda <span className="text-fuchsia-500">Financiera</span></h2>
+                                    </div>
+                                    <div className="calendar-grid text-white/40 text-[10px] font-bold uppercase tracking-widest text-center">
+                                        {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map(d => <div key={d} className="p-4">{d}</div>)}
+                                    </div>
+                                    <div className="calendar-grid">
+                                        {Array.from({length: 35}).map((_, i) => {
+                                            const dayNum = i - 1; // Ajuste simple
+                                            const hasExp = expenses.filter(e => new Date(e.date).getDate() === dayNum);
+                                            return (
+                                                <div key={i} className="calendar-day border-white/5">
+                                                    {dayNum > 0 && dayNum <= 31 && (
+                                                        <>
+                                                            <span className="text-sm font-bold opacity-30">{dayNum}</span>
+                                                            <div className="mt-2 space-y-1">
+                                                                {hasExp.map((e, idx) => (
+                                                                    <div key={idx} className="bg-fuchsia-600 text-[8px] p-1 rounded font-bold truncate">
+                                                                        ${e.amount.toFixed(0)} - {e.desc}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                                <button onClick={() => setView('dashboard')} className="mt-8 text-fuchsia-500 font-bold underline flex items-center gap-2">← Volver al Dashboard</button>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
