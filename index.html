@@ -3,23 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Economy | Elegance Edition</title>
+    <title>Economy | Pure Clarity Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
-        body { background-color: #050505; color: #d1d5db; font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }
-        .card-elegant { background: #0f0f0f; border: 1px solid rgba(255,255,255,0.05); border-radius: 24px; }
-        .accent-gold { color: #c5a059; }
-        .bg-gold { background-color: #c5a059; }
-        .progress-bar-container { height: 4px; background: rgba(255,255,255,0.03); border-radius: 2px; overflow: hidden; }
-        .progress-bar-fill { height: 100%; transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
-        input, select { background: transparent !important; border-bottom: 1px solid rgba(255,255,255,0.1) !important; border-radius: 0 !important; }
-        input:focus { border-bottom: 1px solid #c5a059 !important; outline: none; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 10px; }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap');
+        body { background-color: #fcfcfc; color: #1a1a1a; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .box-ui { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .btn-primary { background: #2563eb; color: white; border-radius: 12px; transition: all 0.3s; }
+        .btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); }
+        .input-ui { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; outline: none; transition: border 0.2s; }
+        .input-ui:focus { border-color: #2563eb; ring: 2px rgba(37, 99, 235, 0.1); }
+        .calendar-day { min-height: 100px; border: 1px solid #f3f4f6; transition: 0.2s; }
+        .calendar-day:hover { background: #f9fafb; }
     </style>
 </head>
 <body>
@@ -28,15 +26,65 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
+        const translations = {
+            es: {
+                welcome: "Bienvenido,",
+                dashboard: "Resumen",
+                budget: "Presupuestos",
+                calendar: "Calendario",
+                logout: "Salir",
+                balance: "Saldo Disponible",
+                income: "Ingresos",
+                expense: "Gastos",
+                add: "Registrar",
+                desc: "Descripción",
+                amount: "Monto ($)",
+                date: "Fecha",
+                method: "Método",
+                installments: "Cuotas",
+                interest: "Interés %",
+                save: "Guardar",
+                edit: "Editar",
+                category: "Categoría",
+                limit: "Límite Mensual",
+                next: "Siguiente",
+                prev: "Anterior"
+            },
+            en: {
+                welcome: "Welcome,",
+                dashboard: "Dashboard",
+                budget: "Budgets",
+                calendar: "Calendar",
+                logout: "Logout",
+                balance: "Balance",
+                income: "Income",
+                expense: "Expenses",
+                add: "Register",
+                desc: "Description",
+                amount: "Amount ($)",
+                date: "Date",
+                method: "Method",
+                installments: "Installments",
+                interest: "Interest %",
+                save: "Save",
+                edit: "Edit",
+                category: "Category",
+                limit: "Monthly Limit",
+                next: "Next",
+                prev: "Prev"
+            }
+        };
+
         const App = () => {
+            const [lang, setLang] = useState('es');
             const [view, setView] = useState('dashboard');
             const [user, setUser] = useState(localStorage.getItem('current_user') || '');
             const [movements, setMovements] = useState([]);
             const [budgets, setBudgets] = useState([]);
             const [type, setType] = useState('gasto');
             const [editingBudget, setEditingBudget] = useState(null);
+            const t = translations[lang];
 
-            // Cargar datos vinculados al usuario
             useEffect(() => {
                 if (user) {
                     const savedMovs = localStorage.getItem(`movements_${user}`);
@@ -46,7 +94,6 @@
                 }
             }, [user]);
 
-            // Guardar datos
             useEffect(() => {
                 if (user) {
                     localStorage.setItem(`movements_${user}`, JSON.stringify(movements));
@@ -54,19 +101,23 @@
                 }
             }, [movements, budgets, user]);
 
-            const addMovement = (e) => {
+            const handleMovement = (e) => {
                 e.preventDefault();
                 const data = new FormData(e.target);
-                const amount = parseFloat(data.get('amount'));
+                const base = parseFloat(data.get('amount'));
+                const interest = parseFloat(data.get('interest') || 0);
                 const inst = data.get('method') === 'credito' ? parseInt(data.get('installments')) : 1;
                 
+                const totalWithInt = base + (base * (interest / 100));
+                const amtPerInst = totalWithInt / inst;
+
                 const newItems = Array.from({ length: inst }, (_, i) => {
                     const d = new Date(data.get('date') + 'T12:00:00');
                     d.setMonth(d.getMonth() + (data.get('method') === 'credito' ? i + 1 : i));
                     return {
                         id: Math.random().toString(36).substr(2, 9),
                         desc: inst > 1 ? `${data.get('desc')} (${i+1}/${inst})` : data.get('desc'),
-                        amount: amount / inst,
+                        amount: amtPerInst,
                         date: d.toISOString().split('T')[0],
                         category: type,
                         budgetId: data.get('budgetId') || null
@@ -80,9 +131,8 @@
                 e.preventDefault();
                 const data = new FormData(e.target);
                 const newB = { id: Date.now(), name: data.get('name'), limit: parseFloat(data.get('limit')) };
-                
                 if (editingBudget) {
-                    setBudgets(budgets.map(b => b.id === editingBudget.id ? { ...b, limit: newB.limit, name: newB.name } : b));
+                    setBudgets(budgets.map(b => b.id === editingBudget.id ? newB : b));
                     setEditingBudget(null);
                 } else {
                     setBudgets([...budgets, newB]);
@@ -91,79 +141,86 @@
             };
 
             const stats = useMemo(() => {
-                const inc = movements.filter(m => m.category === 'ingreso').reduce((a, b) => a + b.amount, 0);
-                const exp = movements.filter(m => m.category === 'gasto').reduce((a, b) => a + b.amount, 0);
+                const inc = movements.filter(m => m.category === 'ingreso').reduce((a,b)=>a+b.amount,0);
+                const exp = movements.filter(m => m.category === 'gasto').reduce((a,b)=>a+b.amount,0);
                 return { inc, exp, bal: inc - exp };
             }, [movements]);
 
             if (!user) {
                 return (
-                    <div className="h-screen flex items-center justify-center bg-black p-6">
-                        <div className="w-full max-w-sm text-center">
-                            <h1 className="text-sm font-light tracking-[0.5em] mb-12 accent-gold uppercase">Economy Elegance</h1>
-                            <input id="u" type="text" placeholder="Identity" className="w-full p-4 mb-8 text-center text-white font-light tracking-widest uppercase border-white/10" />
-                            <button onClick={() => { const v = document.getElementById('u').value.trim(); if(v) { setUser(v); localStorage.setItem('current_user', v); } }} className="w-full py-4 border border-white/20 text-xs font-semibold tracking-[0.3em] hover:bg-white hover:text-black transition-all duration-500 uppercase">Authenticate</button>
+                    <div className="h-screen flex items-center justify-center bg-gray-50">
+                        <div className="box-ui p-12 text-center w-full max-w-sm">
+                            <h1 className="text-2xl font-extrabold text-blue-600 mb-8">Economy Clarity</h1>
+                            <input id="uIn" type="text" placeholder="Usuario" className="input-ui w-full mb-6 text-center" />
+                            <button onClick={() => { const v = document.getElementById('uIn').value.trim(); if(v) { setUser(v); localStorage.setItem('current_user', v); } }} className="btn-primary w-full py-4 font-bold uppercase tracking-wider">Entrar</button>
                         </div>
                     </div>
                 );
             }
 
             return (
-                <div className="min-h-screen px-6 py-12 md:px-20 max-w-7xl mx-auto">
-                    <header className="flex flex-col md:flex-row justify-between items-baseline mb-20 gap-8">
-                        <div>
-                            <h2 className="text-[10px] font-semibold tracking-[0.4em] text-slate-500 uppercase mb-2">Private Portfolio</h2>
-                            <h1 className="text-4xl font-light text-white italic tracking-tighter">Welcome, {user}</h1>
+                <div className="min-h-screen max-w-6xl mx-auto px-6 py-8">
+                    <header className="flex flex-col md:flex-row justify-between items-center mb-12 gap-6">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-black text-xl">{user[0].toUpperCase()}</div>
+                            <div>
+                                <p className="text-xs text-gray-400 font-bold uppercase">{t.welcome}</p>
+                                <h1 className="text-2xl font-extrabold capitalize">{user}</h1>
+                            </div>
                         </div>
-                        <div className="flex gap-12 text-[10px] font-bold tracking-[0.3em] uppercase">
-                            <button onClick={() => setView('dashboard')} className={view === 'dashboard' ? 'accent-gold' : 'hover:text-white transition-colors'}>Overview</button>
-                            <button onClick={() => setView('budget')} className={view === 'budget' ? 'accent-gold' : 'hover:text-white transition-colors'}>Allocation</button>
-                            <button onClick={() => setView('calendar')} className={view === 'calendar' ? 'accent-gold' : 'hover:text-white transition-colors'}>Schedule</button>
-                            <button onClick={() => { setUser(''); localStorage.removeItem('current_user'); }} className="text-slate-700 hover:text-red-900 transition-colors">Logout</button>
-                        </div>
+                        <nav className="flex items-center gap-6 bg-white border border-gray-100 p-2 rounded-2xl shadow-sm font-bold text-xs uppercase tracking-tight">
+                            <button onClick={() => setView('dashboard')} className={`px-4 py-2 rounded-xl transition-all ${view === 'dashboard' ? 'bg-blue-50 text-blue-600' : 'text-gray-400'}`}>{t.dashboard}</button>
+                            <button onClick={() => setView('budget')} className={`px-4 py-2 rounded-xl transition-all ${view === 'budget' ? 'bg-blue-50 text-blue-600' : 'text-gray-400'}`}>{t.budget}</button>
+                            <button onClick={() => setView('calendar')} className={`px-4 py-2 rounded-xl transition-all ${view === 'calendar' ? 'bg-blue-50 text-blue-600' : 'text-gray-400'}`}>{t.calendar}</button>
+                            <div className="w-px h-6 bg-gray-200 mx-2"></div>
+                            <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-xl border border-blue-100">{lang === 'es' ? 'EN' : 'ES'}</button>
+                            <button onClick={() => { setUser(''); localStorage.removeItem('current_user'); }} className="text-red-400 ml-2">{t.logout}</button>
+                        </nav>
                     </header>
 
-                    <main className="animate-in fade-in duration-1000">
+                    <main className="animate-in fade-in duration-500">
                         {view === 'dashboard' && (
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
-                                <div className="lg:col-span-2 space-y-20">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-12 border-b border-white/5 pb-12">
-                                        <Stat title="Balance" value={`$${stats.bal.toLocaleString()}`} />
-                                        <Stat title="Inflow" value={`$${stats.inc.toLocaleString()}`} />
-                                        <Stat title="Outflow" value={`$${stats.exp.toLocaleString()}`} />
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                <div className="lg:col-span-2 space-y-8">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <StatCard title={t.balance} value={`$${stats.bal.toLocaleString()}`} color="text-blue-600" />
+                                        <StatCard title={t.income} value={`$${stats.inc.toLocaleString()}`} color="text-emerald-600" />
+                                        <StatCard title={t.expense} value={`$${stats.exp.toLocaleString()}`} color="text-rose-600" />
                                     </div>
-
-                                    <div className="max-w-xl">
-                                        <div className="flex gap-8 mb-12 text-[10px] font-bold tracking-widest uppercase">
-                                            <button onClick={() => setType('gasto')} className={type === 'gasto' ? 'text-white underline decoration-gold underline-offset-8' : 'text-slate-600'}>Expenditure</button>
-                                            <button onClick={() => setType('ingreso')} className={type === 'ingreso' ? 'text-white underline decoration-gold underline-offset-8' : 'text-slate-600'}>Revenue</button>
+                                    <div className="box-ui p-8">
+                                        <div className="flex gap-4 mb-8">
+                                            <button onClick={() => setType('gasto')} className={`px-6 py-2 rounded-lg font-bold text-[10px] uppercase ${type === 'gasto' ? 'bg-rose-50 text-rose-600' : 'bg-gray-50 text-gray-400'}`}>{t.expense}</button>
+                                            <button onClick={() => setType('ingreso')} className={`px-6 py-2 rounded-lg font-bold text-[10px] uppercase ${type === 'ingreso' ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-50 text-gray-400'}`}>{t.income}</button>
                                         </div>
-                                        <form onSubmit={addMovement} className="grid grid-cols-1 gap-10">
-                                            <input name="desc" placeholder="Descriptor" className="p-4 text-white font-light tracking-wide" required />
-                                            <div className="grid grid-cols-2 gap-8">
-                                                <input name="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} className="p-4 text-white/40" required />
-                                                <input name="amount" type="number" step="0.01" placeholder="Amount ($)" className="p-4 text-white font-light" required />
+                                        <form onSubmit={handleMovement} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <input name="desc" placeholder={t.desc} className="input-ui" required />
+                                            <input name="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} className="input-ui" required />
+                                            <input name="amount" type="number" step="0.01" placeholder={t.amount} className="input-ui" required />
+                                            <select name="method" className="input-ui text-gray-500 bg-white">
+                                                <option value="debito">Débito</option>
+                                                <option value="credito">Crédito</option>
+                                            </select>
+                                            <select name="budgetId" className="input-ui text-gray-500 bg-white">
+                                                <option value="">{t.category}</option>
+                                                {budgets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                            </select>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <input name="installments" type="number" placeholder={t.installments} className="input-ui" />
+                                                <input name="interest" type="number" placeholder={t.interest} className="input-ui" />
                                             </div>
-                                            <div className="grid grid-cols-2 gap-8">
-                                                <select name="budgetId" className="p-4 text-slate-500 text-xs uppercase font-bold tracking-widest border-b border-white/10 outline-none">
-                                                    <option value="">Allocation</option>
-                                                    {budgets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                                                </select>
-                                                <select name="method" className="p-4 text-slate-500 text-xs uppercase font-bold tracking-widest border-b border-white/10 outline-none">
-                                                    <option value="debito">Direct</option>
-                                                    <option value="credito">Credit</option>
-                                                </select>
-                                            </div>
-                                            <button type="submit" className="w-max px-12 py-4 border border-white/10 text-[10px] font-bold tracking-[0.4em] uppercase hover:bg-white hover:text-black transition-all duration-500">Log Entry</button>
+                                            <button type="submit" className="btn-primary md:col-span-2 py-4 font-black uppercase tracking-widest text-xs">{t.save}</button>
                                         </form>
                                     </div>
                                 </div>
-                                <div className="space-y-12">
-                                    <h3 className="text-[10px] font-bold tracking-[0.4em] text-slate-700 uppercase">Recent Activity</h3>
-                                    {movements.slice(-6).reverse().map(m => (
-                                        <div key={m.id} className="flex justify-between items-baseline border-b border-white/5 pb-4">
-                                            <span className="text-xs font-light text-slate-300 uppercase tracking-wider">{m.desc}</span>
-                                            <span className="text-sm font-semibold text-white tracking-tighter">${Math.round(m.amount).toLocaleString()}</span>
+                                <div className="space-y-6">
+                                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 ml-4">Actividad</h3>
+                                    {movements.slice(-8).reverse().map(m => (
+                                        <div key={m.id} className="box-ui p-4 flex justify-between items-center group transition-all hover:border-blue-200">
+                                            <div>
+                                                <p className="font-bold text-sm">{m.desc}</p>
+                                                <p className="text-[10px] text-gray-400 uppercase">{m.date}</p>
+                                            </div>
+                                            <span className={`font-black ${m.category === 'ingreso' ? 'text-emerald-500' : 'text-rose-500'}`}>${Math.round(m.amount).toLocaleString()}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -171,36 +228,30 @@
                         )}
 
                         {view === 'budget' && (
-                            <div className="space-y-16 max-w-4xl mx-auto">
-                                <form onSubmit={handleBudget} className="flex flex-col md:flex-row gap-12 items-end border-b border-white/5 pb-16">
-                                    <div className="flex-1 w-full">
-                                        <label className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Category Name</label>
-                                        <input name="name" defaultValue={editingBudget?.name || ''} className="w-full p-4 text-white text-xl font-light" required />
-                                    </div>
-                                    <div className="flex-1 w-full">
-                                        <label className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Monthly Limit</label>
-                                        <input name="limit" type="number" defaultValue={editingBudget?.limit || ''} className="w-full p-4 text-white text-xl font-light" required />
-                                    </div>
-                                    <button type="submit" className="px-10 py-4 border border-white/20 text-[9px] font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-all duration-500">
-                                        {editingBudget ? 'Update' : 'Establish'}
-                                    </button>
-                                </form>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
+                            <div className="space-y-12">
+                                <div className="box-ui p-8 max-w-2xl mx-auto">
+                                    <h2 className="text-xl font-bold mb-8">{editingBudget ? t.edit : t.add} {t.budget}</h2>
+                                    <form onSubmit={handleBudget} className="space-y-6">
+                                        <input name="name" defaultValue={editingBudget?.name || ''} placeholder={t.desc} className="input-ui w-full" required />
+                                        <input name="limit" type="number" defaultValue={editingBudget?.limit || ''} placeholder={t.limit} className="input-ui w-full" required />
+                                        <button type="submit" className="btn-primary w-full py-4 font-black uppercase tracking-widest text-xs">{t.save}</button>
+                                    </form>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     {budgets.map(b => {
                                         const spent = movements.filter(m => m.budgetId === b.id.toString() && m.category === 'gasto').reduce((a,b)=>a+b.amount,0);
                                         const pct = Math.min(100, (spent/b.limit)*100);
                                         return (
-                                            <div key={b.id} className="space-y-6 group">
-                                                <div className="flex justify-between items-baseline">
+                                            <div key={b.id} className="box-ui p-6 space-y-4">
+                                                <div className="flex justify-between items-end">
                                                     <div>
-                                                        <h4 className="text-sm font-semibold text-white uppercase tracking-widest mb-1">{b.name}</h4>
-                                                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">${Math.round(spent).toLocaleString()} of ${b.limit.toLocaleString()}</span>
+                                                        <h4 className="font-bold uppercase tracking-tight">{b.name}</h4>
+                                                        <p className="text-xs text-gray-400">${Math.round(spent).toLocaleString()} / ${b.limit.toLocaleString()}</p>
                                                     </div>
-                                                    <button onClick={() => setEditingBudget(b)} className="text-[9px] text-slate-700 hover:text-white uppercase tracking-widest transition-colors">Modify</button>
+                                                    <button onClick={() => setEditingBudget(b)} className="text-xs text-blue-600 font-bold hover:underline">{t.edit}</button>
                                                 </div>
-                                                <div className="progress-bar-container">
-                                                    <div className="progress-fill" style={{ width: `${pct}%`, backgroundColor: pct > 90 ? '#ef4444' : '#c5a059' }}></div>
+                                                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                                    <div className={`h-full transition-all duration-700 ${pct > 90 ? 'bg-rose-500' : 'bg-blue-500'}`} style={{ width: `${pct}%` }}></div>
                                                 </div>
                                             </div>
                                         );
@@ -209,46 +260,51 @@
                             </div>
                         )}
 
-                        {view === 'calendar' && (
-                            <CalendarView movements={movements} />
-                        )}
+                        {view === 'calendar' && <CalendarView movements={movements} t={t} />}
                     </main>
                 </div>
             );
         };
 
-        const CalendarView = ({ movements }) => {
+        const CalendarView = ({ movements, t }) => {
             const [curr, setCurr] = useState(new Date());
             const first = new Date(curr.getFullYear(), curr.getMonth(), 1).getDay();
-            const days = new Date(curr.getFullYear(), curr.getMonth() + 1, 0).getDate();
-            const calDays = [...Array(first).fill(null), ...Array.from({length: days}, (_, i) => i + 1)];
+            const daysCount = new Date(curr.getFullYear(), curr.getMonth() + 1, 0).getDate();
+            const days = [...Array(first).fill(null), ...Array.from({length: daysCount}, (_, i) => i + 1)];
 
             return (
-                <div className="max-w-5xl mx-auto space-y-12">
-                    <div className="flex justify-between items-baseline mb-12">
-                        <h2 className="text-4xl font-light italic text-white tracking-tighter uppercase">{curr.toLocaleString('en-US', { month: 'long', year: 'numeric' })}</h2>
-                        <div className="flex gap-8 text-[9px] font-black uppercase tracking-widest">
-                            <button onClick={() => setCurr(new Date(curr.setMonth(curr.getMonth()-1)))} className="hover:text-white transition-colors">Back</button>
-                            <button onClick={() => setCurr(new Date(curr.setMonth(curr.getMonth()+1)))} className="hover:text-white transition-colors">Next</button>
+                <div className="box-ui overflow-hidden">
+                    <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                        <h2 className="text-2xl font-black capitalize">{curr.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}</h2>
+                        <div className="flex gap-4">
+                            <button onClick={() => setCurr(new Date(curr.setMonth(curr.getMonth()-1)))} className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-white text-xs font-bold uppercase tracking-widest transition-all">{t.prev}</button>
+                            <button onClick={() => setCurr(new Date(curr.setMonth(curr.getMonth()+1)))} className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-white text-xs font-bold uppercase tracking-widest transition-all">{t.next}</button>
                         </div>
                     </div>
-                    <div className="grid grid-cols-7 border-t border-l border-white/5">
-                        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
-                            <div key={d} className="p-4 border-r border-b border-white/5 text-[9px] font-bold text-slate-700 uppercase tracking-widest text-center">{d}</div>
+                    <div className="grid grid-cols-7 border-b border-gray-100 bg-gray-50/30">
+                        {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map(d => (
+                            <div key={d} className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center border-r border-gray-100">{d}</div>
                         ))}
-                        {calDays.map((d, i) => {
+                    </div>
+                    <div className="grid grid-cols-7">
+                        {days.map((d, i) => {
                             const ds = `${curr.getFullYear()}-${String(curr.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                            const dayM = movements.filter(m => m.date === ds);
+                            const ms = movements.filter(m => m.date === ds);
+                            const isToday = d === new Date().getDate() && curr.getMonth() === new Date().getMonth();
                             return (
-                                <div key={i} className="min-h-[120px] p-4 border-r border-b border-white/5 relative group hover:bg-white/[0.02] transition-all">
-                                    <span className="text-xs font-semibold text-slate-800 group-hover:text-slate-400 transition-colors">{d}</span>
-                                    <div className="mt-4 space-y-2">
-                                        {dayM.map((m, idx) => (
-                                            <div key={idx} className="text-[8px] font-bold uppercase tracking-widest text-white/50 border-l border-gold/50 pl-2">
-                                                ${Math.round(m.amount)} · {m.desc}
+                                <div key={i} className={`calendar-day p-4 border-r border-b ${!d ? 'bg-gray-50/20' : ''}`}>
+                                    {d && (
+                                        <>
+                                            <span className={`text-sm font-bold ${isToday ? 'text-blue-600' : 'text-gray-300'}`}>{d}</span>
+                                            <div className="mt-2 space-y-1">
+                                                {ms.map((m, idx) => (
+                                                    <div key={idx} className={`text-[8px] p-1 rounded font-black truncate shadow-sm ${m.category === 'ingreso' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                        ${Math.round(m.amount)} - {m.desc}
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
-                                    </div>
+                                        </>
+                                    )}
                                 </div>
                             );
                         })}
@@ -257,10 +313,10 @@
             );
         };
 
-        const Stat = ({ title, value }) => (
-            <div>
-                <p className="text-[10px] font-bold tracking-[0.4em] text-slate-600 uppercase mb-4">{title}</p>
-                <h3 className="text-2xl font-semibold text-white tracking-tighter">{value}</h3>
+        const StatCard = ({ title, value, color }) => (
+            <div className="box-ui p-8 transition-all hover:translate-y-[-2px]">
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">{title}</p>
+                <h3 className={`text-2xl font-extrabold ${color}`}>{value}</h3>
             </div>
         );
 
