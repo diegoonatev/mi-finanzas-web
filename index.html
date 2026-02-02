@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Economy Pro | Gestión y Metas</title>
+    <title>Economy Pro | Presupuestos y Persistencia</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -11,11 +11,10 @@
     <style>
         body { background-color: #020617; color: #f8fafc; font-family: 'Inter', sans-serif; }
         .glass { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(59, 130, 246, 0.1); }
-        .calendar-day { background: #0f172a; min-height: 110px; padding: 8px; border: 1px solid rgba(255,255,255,0.02); transition: 0.2s; }
-        .calendar-day:hover { background: #1e293b; border-color: #3b82f6; cursor: pointer; }
+        .calendar-day { background: #0f172a; min-height: 110px; padding: 8px; border: 1px solid rgba(255,255,255,0.02); }
         .tab-active { background: #3b82f6; color: white; box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
-        .progress-bg { background: rgba(255,255,255,0.05); border-radius: 99px; height: 10px; overflow: hidden; }
-        .progress-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #06b6d4); transition: width 0.6s ease; }
+        .progress-bg { background: rgba(255,255,255,0.05); border-radius: 99px; height: 12px; overflow: hidden; }
+        .progress-fill { height: 100%; transition: width 0.6s ease; }
     </style>
 </head>
 <body>
@@ -28,100 +27,86 @@
             const [view, setView] = useState('dashboard');
             const [user, setUser] = useState(localStorage.getItem('current_user') || '');
             const [movements, setMovements] = useState([]);
-            const [goals, setGoals] = useState([]);
+            const [budgets, setBudgets] = useState([]); // Gastos Fijos / Presupuesto
             const [type, setType] = useState('gasto');
             const [method, setMethod] = useState('debito');
 
-            // Cargar y guardar datos por usuario
+            // --- CARGA DE DATOS SEGURA ---
             useEffect(() => {
                 if (user) {
                     const savedMovs = localStorage.getItem(`movements_${user}`);
-                    const savedGoals = localStorage.getItem(`goals_${user}`);
+                    const savedBudgets = localStorage.getItem(`budgets_${user}`);
                     setMovements(savedMovs ? JSON.parse(savedMovs) : []);
-                    setGoals(savedGoals ? JSON.parse(savedGoals) : []);
+                    setBudgets(savedBudgets ? JSON.parse(savedBudgets) : []);
+                } else {
+                    setMovements([]);
+                    setBudgets([]);
                 }
             }, [user]);
 
+            // --- PERSISTENCIA AUTOMÁTICA ---
             useEffect(() => {
                 if (user) {
                     localStorage.setItem(`movements_${user}`, JSON.stringify(movements));
-                    localStorage.setItem(`goals_${user}`, JSON.stringify(goals));
+                    localStorage.setItem(`budgets_${user}`, JSON.stringify(budgets));
                 }
-            }, [movements, goals, user]);
+            }, [movements, budgets, user]);
 
-            const handleMovement = (e) => {
+            const addMovement = (e) => {
                 e.preventDefault();
                 const data = new FormData(e.target);
                 const baseAmount = parseFloat(data.get('amount'));
-                const interest = parseFloat(data.get('interest') || 0);
-                const installments = method === 'credito' ? parseInt(data.get('installments')) : 1;
-                const dateSelected = new Date(data.get('date') + 'T12:00:00');
-                const goalId = data.get('goalId');
-                
-                const totalWithInterest = baseAmount + (baseAmount * (interest / 100));
-                const amountPerInstallment = totalWithInterest / installments;
+                const inst = method === 'credito' ? parseInt(data.get('installments')) : 1;
+                const dateStart = new Date(data.get('date') + 'T12:00:00');
+                const budgetId = data.get('budgetId');
 
-                const newItems = Array.from({ length: installments }, (_, i) => {
-                    const d = new Date(dateSelected);
-                    const monthOffset = (method === 'credito') ? i + 1 : i;
-                    d.setMonth(d.getMonth() + monthOffset);
-
+                const newItems = Array.from({ length: inst }, (_, i) => {
+                    const d = new Date(dateStart);
+                    const offset = (method === 'credito') ? i + 1 : i;
+                    d.setMonth(d.getMonth() + offset);
                     return {
                         id: Math.random().toString(36).substr(2, 9),
-                        desc: installments > 1 ? `${data.get('desc')} (${i+1}/${installments})` : data.get('desc'),
-                        amount: amountPerInstallment,
+                        desc: inst > 1 ? `${data.get('desc')} (${i+1}/${inst})` : data.get('desc'),
+                        amount: baseAmount / inst,
                         date: d.toISOString().split('T')[0],
                         category: type,
                         method: method,
-                        goalRef: type === 'ahorro' ? goalId : null
+                        budgetId: budgetId || null
                     };
                 });
 
-                if (type === 'ahorro' && goalId) {
-                    const updatedGoals = goals.map(g => 
-                        g.id.toString() === goalId.toString() ? { ...g, current: g.current + baseAmount } : g
-                    );
-                    setGoals(updatedGoals);
-                }
-
                 setMovements([...movements, ...newItems]);
                 e.target.reset();
-                setMethod('debito');
             };
 
-            const addGoal = (e) => {
+            const addBudget = (e) => {
                 e.preventDefault();
                 const data = new FormData(e.target);
-                const newGoal = {
+                const newB = {
                     id: Date.now(),
                     name: data.get('name'),
-                    target: parseFloat(data.get('target')),
-                    current: 0
+                    limit: parseFloat(data.get('limit'))
                 };
-                setGoals([...goals, newGoal]);
+                setBudgets([...budgets, newB]);
                 e.target.reset();
             };
 
-            const deleteMovement = (id) => {
-                const mov = movements.find(m => m.id === id);
-                if (mov && mov.category === 'ahorro' && mov.goalRef) {
-                    setGoals(goals.map(g => g.id.toString() === mov.goalRef.toString() ? { ...g, current: Math.max(0, g.current - mov.amount) } : g));
-                }
-                setMovements(movements.filter(m => m.id !== id));
+            const getSpentInBudget = (id) => {
+                return movements
+                    .filter(m => m.budgetId === id.toString() && m.category === 'gasto')
+                    .reduce((a, b) => a + b.amount, 0);
             };
-
-            const totalIn = movements.filter(m => m.category === 'ingreso').reduce((a, b) => a + b.amount, 0);
-            const totalOut = movements.filter(m => m.category === 'gasto' || m.category === 'ahorro').reduce((a, b) => a + b.amount, 0);
-            const balance = totalIn - totalOut;
 
             if (!user) {
                 return (
                     <div className="h-screen flex items-center justify-center bg-[#020617] p-6">
-                        <div className="glass p-12 rounded-[3rem] text-center w-full max-w-sm shadow-2xl">
-                            <h1 className="text-4xl font-black mb-2 text-blue-500 italic tracking-tighter">ECONOMY<span className="text-white">PRO</span></h1>
-                            <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] mb-10">Financial Intelligence Hub</p>
-                            <input id="uIn" type="text" placeholder="USUARIO" className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 mb-4 text-center outline-none focus:border-blue-500 text-white font-bold" />
-                            <button onClick={() => { const v = document.getElementById('uIn').value.trim(); if(v) setUser(v); localStorage.setItem('current_user', v); }} className="w-full bg-blue-600 py-4 rounded-2xl font-black hover:bg-blue-500 transition-all uppercase tracking-widest text-sm">Ingresar al Panel</button>
+                        <div className="glass p-12 rounded-[3rem] text-center w-full max-w-sm shadow-2xl border-blue-500/20">
+                            <h1 className="text-4xl font-black mb-10 text-blue-500 italic uppercase">Economy<span className="text-white">Pro</span></h1>
+                            <input id="uIn" type="text" placeholder="NOMBRE DE USUARIO" className="w-full p-5 rounded-2xl bg-slate-900 border border-slate-800 mb-6 text-center outline-none focus:border-blue-500 text-white font-bold" />
+                            <button onClick={() => { 
+                                const v = document.getElementById('uIn').value.trim(); 
+                                if(v) { setUser(v); localStorage.setItem('current_user', v); }
+                            }} className="w-full bg-blue-600 py-5 rounded-2xl font-black hover:bg-blue-500 transition-all uppercase tracking-widest text-sm shadow-lg shadow-blue-900/40">Entrar</button>
                         </div>
                     </div>
                 );
@@ -131,141 +116,106 @@
                 <div className="min-h-screen">
                     <header className="p-6 md:p-10 flex flex-col md:flex-row justify-between items-center gap-6 sticky top-0 bg-[#020617]/95 backdrop-blur-md z-50">
                         <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl flex items-center justify-center font-black text-2xl shadow-xl shadow-blue-900/40 italic uppercase text-white">
-                                {user[0]}
-                            </div>
-                            <div>
-                                <h1 className="text-2xl font-black text-white italic tracking-tighter uppercase">{view}</h1>
-                                <p className="text-blue-500 font-bold text-[10px] tracking-[0.3em] uppercase">ID: {user}</p>
-                            </div>
+                            <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center font-black text-white italic">{user[0].toUpperCase()}</div>
+                            <h1 className="text-xl font-black text-white italic tracking-tighter uppercase">Hola, {user}</h1>
                         </div>
                         <div className="flex glass p-1.5 rounded-2xl">
-                            <button onClick={() => setView('dashboard')} className={`px-8 py-3 rounded-xl font-black text-xs transition-all ${view === 'dashboard' ? 'tab-active' : 'text-slate-500 hover:text-white'}`}>RESUMEN</button>
-                            <button onClick={() => setView('calendar')} className={`px-8 py-3 rounded-xl font-black text-xs transition-all ${view === 'calendar' ? 'tab-active' : 'text-slate-500 hover:text-white'}`}>CALENDARIO</button>
-                            <button onClick={() => { setUser(''); localStorage.removeItem('current_user'); }} className="ml-2 px-4 py-3 text-slate-600 hover:text-rose-500 font-black text-[10px]">SALIR</button>
+                            {['dashboard', 'presupuesto', 'calendar'].map(v => (
+                                <button key={v} onClick={() => setView(v)} className={`px-6 py-2.5 rounded-xl font-black text-[10px] transition-all uppercase ${view === v ? 'tab-active' : 'text-slate-500 hover:text-white'}`}>{v}</button>
+                            ))}
+                            <button onClick={() => { setUser(''); localStorage.removeItem('current_user'); }} className="ml-2 px-4 py-2.5 text-rose-500 font-black text-[10px] uppercase">Salir</button>
                         </div>
                     </header>
 
                     <main className="px-6 md:px-10 max-w-7xl mx-auto space-y-12 pb-24">
-                        {view === 'dashboard' ? (
-                            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 animate-in fade-in duration-700">
-                                
-                                <div className="lg:col-span-3 space-y-10">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <StatCard title="Disponible" value={`$${balance.toLocaleString()}`} color="text-blue-400" />
-                                        <StatCard title="Ingresos" value={`$${totalIn.toLocaleString()}`} color="text-emerald-400" />
-                                        <StatCard title="Salidas" value={`$${totalOut.toLocaleString()}`} color="text-rose-400" />
+                        {view === 'dashboard' && (
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">
+                                <div className="lg:col-span-2 space-y-8">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <StatCard title="Disponible" value={`$${(movements.filter(m=>m.category==='ingreso').reduce((a,b)=>a+b.amount,0) - movements.filter(m=>m.category==='gasto').reduce((a,b)=>a+b.amount,0)).toLocaleString()}`} color="text-blue-400" />
+                                        <StatCard title="Gastos Totales" value={`$${movements.filter(m=>m.category==='gasto').reduce((a,b)=>a+b.amount,0).toLocaleString()}`} color="text-rose-400" />
                                     </div>
 
-                                    {/* Formulario Principal */}
-                                    <div className="glass p-10 rounded-[3rem] border-l-8 border-blue-600 shadow-2xl relative overflow-hidden">
-                                        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 blur-[100px] rounded-full"></div>
-                                        <div className="flex gap-4 mb-10 overflow-x-auto pb-2">
-                                            {['gasto', 'ingreso', 'ahorro'].map(t => (
-                                                <button key={t} onClick={() => setType(t)} className={`px-8 py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all whitespace-nowrap ${type === t ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500'}`}>{t}</button>
+                                    <div className="glass p-10 rounded-[3rem] border-l-8 border-blue-600 shadow-2xl">
+                                        <div className="flex gap-4 mb-8">
+                                            {['gasto', 'ingreso'].map(t => (
+                                                <button key={t} onClick={() => setType(t)} className={`px-8 py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${type === t ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500'}`}>{t}</button>
                                             ))}
                                         </div>
-                                        
-                                        <form onSubmit={handleMovement} className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Concepto</label>
-                                                <input name="desc" placeholder="Ej. Suscripción Mensual" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-2xl outline-none focus:border-blue-500" required />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Fecha de Registro</label>
-                                                <input name="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full bg-slate-900 border border-slate-800 p-4 rounded-2xl outline-none focus:border-blue-500 text-white" required />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Monto ($)</label>
-                                                <input name="amount" type="number" step="0.01" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-2xl outline-none focus:border-blue-500" required />
-                                            </div>
+                                        <form onSubmit={addMovement} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <input name="desc" placeholder="Descripción" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl outline-none focus:border-blue-500" required />
+                                            <input name="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl outline-none text-white" required />
+                                            <input name="amount" type="number" step="0.01" placeholder="Monto ($)" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl outline-none focus:border-blue-500" required />
+                                            
+                                            <select name="budgetId" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl outline-none">
+                                                <option value="">Vincular a Presupuesto (Opcional)</option>
+                                                {budgets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                            </select>
 
-                                            {type === 'ahorro' ? (
-                                                <div className="space-y-2">
-                                                    <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest ml-1">Asignar a Meta</label>
-                                                    <select name="goalId" className="w-full bg-slate-900 border border-slate-800 p-4 rounded-2xl outline-none" required>
-                                                        <option value="">Selecciona una meta...</option>
-                                                        {goals.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                                                    </select>
-                                                </div>
-                                            ) : (
-                                                <div className="space-y-2">
-                                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Método</label>
-                                                    <select value={method} onChange={(e) => setMethod(e.target.value)} className="w-full bg-slate-900 border border-slate-800 p-4 rounded-2xl outline-none appearance-none">
-                                                        <option value="debito">Inmediato / Débito</option>
-                                                        <option value="credito">Tarjeta de Crédito</option>
-                                                    </select>
-                                                </div>
-                                            )}
+                                            <select value={method} onChange={(e) => setMethod(e.target.value)} className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl outline-none">
+                                                <option value="debito">Débito / Inmediato</option>
+                                                <option value="credito">Crédito (Cuotas)</option>
+                                            </select>
 
-                                            {method === 'credito' && type !== 'ahorro' && (
-                                                <div className="md:col-span-2 grid grid-cols-2 gap-8 animate-in slide-in-from-top-4">
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-1">Cuotas</label>
-                                                        <input name="installments" type="number" min="1" defaultValue="1" className="w-full bg-blue-900/10 border border-blue-500/30 p-4 rounded-2xl outline-none" required />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-1">Interés (%)</label>
-                                                        <input name="interest" type="number" step="0.1" defaultValue="0" className="w-full bg-blue-900/10 border border-blue-500/30 p-4 rounded-2xl outline-none" />
-                                                    </div>
-                                                </div>
+                                            {method === 'credito' && (
+                                                <input name="installments" type="number" min="1" placeholder="N° de cuotas" className="w-full bg-blue-900/20 border border-blue-500/30 p-4 rounded-xl text-white" required />
                                             )}
                                             
-                                            <button type="submit" className="md:col-span-2 py-5 rounded-2xl font-black tracking-[0.2em] uppercase transition-all shadow-xl bg-blue-600 hover:bg-blue-500 shadow-blue-900/20 text-sm">
-                                                Confirmar {type}
-                                            </button>
+                                            <button type="submit" className={`md:col-span-2 py-5 rounded-xl font-black tracking-widest uppercase transition-all shadow-xl ${type === 'gasto' ? 'bg-rose-600 hover:bg-rose-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>Guardar {type}</button>
                                         </form>
                                     </div>
                                 </div>
+                                <div className="space-y-6">
+                                    <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">Actividad Reciente</h2>
+                                    {movements.slice(-10).reverse().map(m => (
+                                        <div key={m.id} className="glass p-4 rounded-2xl flex justify-between items-center group">
+                                            <div>
+                                                <p className="font-bold text-xs truncate w-24 uppercase">{m.desc}</p>
+                                                <p className="text-[8px] text-slate-500 font-bold uppercase">{m.date}</p>
+                                            </div>
+                                            <span className={`font-black text-sm ${m.category === 'ingreso' ? 'text-emerald-400' : 'text-rose-400'}`}>${Math.round(m.amount).toLocaleString()}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
-                                {/* Sidebar: Metas y Recientes */}
-                                <div className="space-y-10">
-                                    <div className="glass p-8 rounded-[2.5rem] border-t-2 border-fuchsia-500/30">
-                                        <h2 className="text-xs font-black italic text-fuchsia-500 tracking-[0.2em] uppercase mb-8">Agenda de Ahorro</h2>
-                                        <div className="space-y-6 mb-8">
-                                            {goals.map(g => (
-                                                <div key={g.id}>
-                                                    <div className="flex justify-between text-[10px] font-black mb-2 uppercase">
-                                                        <span>{g.name}</span>
-                                                        <span className="text-blue-400">{Math.round((g.current/g.target)*100)}%</span>
+                        {view === 'presupuesto' && (
+                            <div className="space-y-8 animate-in fade-in duration-500">
+                                <div className="glass p-10 rounded-[3rem]">
+                                    <h2 className="text-2xl font-black italic mb-8 border-b border-white/5 pb-4">Configurar Gastos Fijos (Presupuesto Mensual)</h2>
+                                    <form onSubmit={addBudget} className="flex flex-col md:flex-row gap-4 mb-10">
+                                        <input name="name" placeholder="Nombre (Ej. Alimentación)" className="flex-1 bg-slate-900 border border-slate-800 p-4 rounded-xl outline-none focus:border-blue-500" required />
+                                        <input name="limit" type="number" placeholder="Límite Mensual ($)" className="w-full md:w-64 bg-slate-900 border border-slate-800 p-4 rounded-xl outline-none focus:border-blue-500" required />
+                                        <button type="submit" className="bg-blue-600 px-10 py-4 rounded-xl font-black text-xs uppercase hover:bg-blue-500 shadow-xl shadow-blue-900/20">Crear Categoría</button>
+                                    </form>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        {budgets.map(b => {
+                                            const spent = getSpentInBudget(b.id);
+                                            const pct = Math.min(100, (spent / b.limit) * 100);
+                                            return (
+                                                <div key={b.id} className="glass p-6 rounded-3xl border border-white/5">
+                                                    <div className="flex justify-between items-end mb-4">
+                                                        <div>
+                                                            <h3 className="text-lg font-black uppercase italic tracking-tighter text-blue-400">{b.name}</h3>
+                                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Gasto: ${Math.round(spent).toLocaleString()} / ${b.limit.toLocaleString()}</p>
+                                                        </div>
+                                                        <span className={`text-xl font-black ${pct >= 90 ? 'text-rose-500' : 'text-white'}`}>{Math.round(pct)}%</span>
                                                     </div>
                                                     <div className="progress-bg">
-                                                        <div className="progress-fill" style={{ width: `${Math.min(100, (g.current/g.target)*100)}%` }}></div>
-                                                    </div>
-                                                    <p className="text-[9px] text-slate-500 mt-2 font-bold">${g.current.toLocaleString()} de ${g.target.toLocaleString()}</p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <form onSubmit={addGoal} className="space-y-4">
-                                            <input name="name" placeholder="Nueva meta..." className="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs outline-none focus:border-fuchsia-500" required />
-                                            <input name="target" type="number" placeholder="Monto objetivo" className="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs outline-none focus:border-fuchsia-500" required />
-                                            <button type="submit" className="w-full py-3 bg-fuchsia-600/10 text-fuchsia-500 border border-fuchsia-500/20 rounded-xl text-[9px] font-black uppercase hover:bg-fuchsia-500 hover:text-white transition-all">Crear Meta</button>
-                                        </form>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <h2 className="text-[10px] font-black italic text-slate-500 tracking-[0.2em] uppercase ml-4">Movimientos</h2>
-                                        <div className="space-y-3">
-                                            {movements.slice(-5).reverse().map(m => (
-                                                <div key={m.id} className="glass p-4 rounded-2xl border border-white/5 flex justify-between items-center group">
-                                                    <div>
-                                                        <p className="font-bold text-[11px] truncate w-24 group-hover:text-blue-400 transition-colors uppercase">{m.desc}</p>
-                                                        <p className="text-[8px] text-slate-600 font-bold">{m.date}</p>
-                                                    </div>
-                                                    <div className="flex flex-col items-end">
-                                                        <span className={`font-black text-xs ${m.category === 'ingreso' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                            ${Math.round(m.amount).toLocaleString()}
-                                                        </span>
-                                                        <button onClick={() => deleteMovement(m.id)} className="text-[7px] text-slate-800 hover:text-rose-500 font-bold uppercase mt-1 opacity-0 group-hover:opacity-100 transition-opacity tracking-widest">Borrar</button>
+                                                        <div className={`progress-fill ${pct >= 90 ? 'bg-rose-500' : pct >= 70 ? 'bg-amber-500' : 'bg-blue-600'}`} style={{ width: `${pct}%` }}></div>
                                                     </div>
                                                 </div>
-                                            ))}
-                                        </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             </div>
-                        ) : (
-                            <CalendarView movements={movements} onDelete={deleteMovement} />
+                        )}
+
+                        {view === 'calendar' && (
+                            <CalendarView movements={movements} onDelete={(id) => setMovements(movements.filter(m=>m.id!==id))} />
                         )}
                     </main>
                 </div>
@@ -274,20 +224,17 @@
 
         const CalendarView = ({ movements, onDelete }) => {
             const [curr, setCurr] = useState(new Date());
-            const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
             const first = new Date(curr.getFullYear(), curr.getMonth(), 1).getDay();
             const days = new Date(curr.getFullYear(), curr.getMonth() + 1, 0).getDate();
             const calDays = [...Array(first).fill(null), ...Array.from({length: days}, (_, i) => i + 1)];
 
             return (
-                <div className="glass rounded-[3rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500">
-                    <div className="p-10 border-b border-white/10 flex flex-col md:flex-row justify-between items-center bg-blue-900/5 gap-8">
-                        <h2 className="text-4xl font-black italic tracking-tighter uppercase italic">
-                            {monthNames[curr.getMonth()]} <span className="text-blue-600">{curr.getFullYear()}</span>
-                        </h2>
+                <div className="glass rounded-[3rem] overflow-hidden shadow-2xl">
+                    <div className="p-10 border-b border-white/10 flex justify-between items-center bg-blue-900/5">
+                        <h2 className="text-4xl font-black italic tracking-tighter uppercase italic text-white">{curr.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}</h2>
                         <div className="flex gap-4">
-                            <button onClick={() => setCurr(new Date(curr.setMonth(curr.getMonth() - 1)))} className="px-6 py-3 glass rounded-2xl hover:bg-blue-600 transition-all font-bold text-xs">ANTERIOR</button>
-                            <button onClick={() => setCurr(new Date(curr.setMonth(curr.getMonth() + 1)))} className="px-6 py-3 glass rounded-2xl hover:bg-blue-600 transition-all font-bold text-xs">SIGUIENTE</button>
+                            <button onClick={() => setCurr(new Date(curr.setMonth(curr.getMonth() - 1)))} className="px-6 py-3 glass rounded-2xl hover:bg-blue-600 transition-all font-bold text-xs uppercase">Anterior</button>
+                            <button onClick={() => setCurr(new Date(curr.setMonth(curr.getMonth() + 1)))} className="px-6 py-3 glass rounded-2xl hover:bg-blue-600 transition-all font-bold text-xs uppercase">Siguiente</button>
                         </div>
                     </div>
                     <div className="grid grid-cols-7 text-[9px] font-black text-blue-500 uppercase tracking-[0.3em] text-center bg-slate-950/40">
@@ -298,15 +245,15 @@
                             const ds = `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                             const ms = movements.filter(m => m.date === ds);
                             return (
-                                <div key={i} className="calendar-day group">
+                                <div key={i} className="calendar-day group border-white/5">
                                     {d && (
                                         <>
                                             <span className="text-xs font-black text-slate-700 group-hover:text-blue-500">{d}</span>
-                                            <div className="mt-3 space-y-1.5">
+                                            <div className="mt-3 space-y-1">
                                                 {ms.map((m, idx) => (
-                                                    <div key={idx} className={`text-[7px] p-2 rounded-lg font-black truncate flex justify-between items-center shadow-lg ${m.category === 'ingreso' ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/20' : 'bg-blue-600 text-white'}`}>
+                                                    <div key={idx} className={`text-[7px] p-1.5 rounded-lg font-black truncate shadow-lg flex justify-between items-center ${m.category === 'ingreso' ? 'bg-emerald-600/20 text-emerald-400' : 'bg-blue-600 text-white'}`}>
                                                         <span>${Math.round(m.amount)}</span>
-                                                        <button onClick={() => onDelete(m.id)} className="ml-1 opacity-0 group-hover:opacity-100 hover:text-rose-300">×</button>
+                                                        <button onClick={() => onDelete(m.id)} className="ml-1 opacity-0 group-hover:opacity-100 text-rose-300">×</button>
                                                     </div>
                                                 ))}
                                             </div>
@@ -321,9 +268,9 @@
         };
 
         const StatCard = ({ title, value, color }) => (
-            <div className="glass p-8 rounded-[2rem] border-t-2 border-blue-500/10 hover:border-blue-500/40 transition-all group">
-                <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest group-hover:text-blue-400 transition-colors">{title}</p>
-                <h3 className={`text-3xl font-black mt-3 tracking-tighter ${color}`}>{value}</h3>
+            <div className="glass p-8 rounded-[2rem] border-t-2 border-blue-500/10">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{title}</p>
+                <h3 className={`text-4xl font-black mt-3 tracking-tighter ${color}`}>{value}</h3>
             </div>
         );
 
