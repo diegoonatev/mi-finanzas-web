@@ -3,18 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Finanzas Hub | Deep Purple</title>
+    <title>Finanzas Hub | Deep Purple Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        body { background-color: #0f051a; color: white; }
-        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: rgba(255, 255, 255, 0.1); }
-        .calendar-day { background: #1a0b2e; height: 100px; padding: 8px; transition: all 0.2s; }
+        body { background-color: #0f051a; color: white; font-family: sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: rgba(255, 255, 255, 0.05); }
+        .calendar-day { background: #1a0b2e; min-height: 90px; padding: 10px; transition: 0.3s; }
         .calendar-day:hover { background: #2d1250; }
+        .progress-bar { height: 8px; border-radius: 4px; background: rgba(255,255,255,0.1); overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #d946ef, #8b5cf6); transition: width 0.5s ease-out; }
     </style>
 </head>
 <body>
@@ -27,11 +28,13 @@
             const [view, setView] = useState('dashboard');
             const [user, setUser] = useState(localStorage.getItem('userName') || '');
             const [expenses, setExpenses] = useState(JSON.parse(localStorage.getItem('expenses')) || []);
+            const [savings, setSavings] = useState(JSON.parse(localStorage.getItem('savings')) || []);
             const [paymentType, setPaymentType] = useState('debito');
 
             useEffect(() => {
                 localStorage.setItem('expenses', JSON.stringify(expenses));
-            }, [expenses]);
+                localStorage.setItem('savings', JSON.stringify(savings));
+            }, [expenses, savings]);
 
             const addExpense = (e) => {
                 e.preventDefault();
@@ -56,92 +59,133 @@
                 setPaymentType('debito');
             };
 
-            // Pantalla de Bienvenida
+            const addSavingGoal = (e) => {
+                e.preventDefault();
+                const data = new FormData(e.target);
+                const newGoal = {
+                    id: Date.now(),
+                    name: data.get('name'),
+                    target: parseFloat(data.get('target')),
+                    current: 0
+                };
+                setSavings([...savings, newGoal]);
+                e.target.reset();
+            };
+
             if (!user) {
                 return (
-                    <div className="h-screen flex items-center justify-center bg-gradient-to-br from-[#1a0b2e] to-[#4c1d95]">
-                        <div className="glass p-12 rounded-[3rem] text-center max-w-sm w-full">
-                            <h1 className="text-4xl font-black mb-6 tracking-tighter italic">FINANZAS<span className="text-fuchsia-500">PRO</span></h1>
-                            <input id="nameInput" type="text" placeholder="Tu nombre..." className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 mb-4 outline-none focus:ring-2 ring-fuchsia-500" />
+                    <div className="h-screen flex items-center justify-center bg-gradient-to-br from-[#12061f] to-[#2e1065]">
+                        <div className="glass p-12 rounded-[3rem] text-center max-w-sm w-full shadow-2xl">
+                            <h1 className="text-4xl font-black mb-6 italic tracking-tighter">FINANZAS<span className="text-fuchsia-500 font-black">HUB</span></h1>
+                            <input id="nameInput" type="text" placeholder="¿Cómo te llamas?" className="w-full p-5 rounded-2xl bg-white/5 border border-white/10 mb-4 outline-none focus:ring-2 ring-fuchsia-500 text-center text-lg" />
                             <button onClick={() => {
                                 const val = document.getElementById('nameInput').value;
                                 if(val) { setUser(val); localStorage.setItem('userName', val); }
-                            }} className="w-full bg-fuchsia-600 py-4 rounded-2xl font-bold shadow-lg shadow-fuchsia-500/20">ENTRAR</button>
+                            }} className="w-full bg-fuchsia-600 py-5 rounded-2xl font-black shadow-lg shadow-fuchsia-500/20 hover:bg-fuchsia-500 transition-all">ENTRAR</button>
                         </div>
                     </div>
                 );
             }
 
             return (
-                <div className="min-h-screen pb-20">
-                    <header className="p-8 flex justify-between items-center">
+                <div className="min-h-screen pb-24">
+                    <header className="p-8 flex justify-between items-center sticky top-0 bg-[#0f051a]/80 backdrop-blur-md z-40">
                         <div>
-                            <h2 className="text-white/40 text-xs font-bold uppercase tracking-widest">Bienvenido de nuevo</h2>
-                            <h1 className="text-3xl font-black italic">{user.toUpperCase()}</h1>
+                            <h2 className="text-fuchsia-500 text-[10px] font-black uppercase tracking-[0.3em]">Panel de Control</h2>
+                            <h1 className="text-3xl font-black italic uppercase tracking-tighter">Hola, {user}</h1>
                         </div>
-                        <div className="flex gap-2">
-                            <button onClick={() => setView('dashboard')} className={`p-4 rounded-2xl transition-all ${view === 'dashboard' ? 'bg-fuchsia-600' : 'glass'}`}>Dashboard</button>
-                            <button onClick={() => setView('calendar')} className={`p-4 rounded-2xl transition-all ${view === 'calendar' ? 'bg-fuchsia-600' : 'glass'}`}>Calendario</button>
+                        <div className="flex gap-2 glass p-1.5 rounded-2xl">
+                            <button onClick={() => setView('dashboard')} className={`px-6 py-2.5 rounded-xl font-bold transition-all ${view === 'dashboard' ? 'bg-fuchsia-600 shadow-lg' : 'hover:bg-white/5 text-white/40'}`}>Resumen</button>
+                            <button onClick={() => setView('calendar')} className={`px-6 py-2.5 rounded-xl font-bold transition-all ${view === 'calendar' ? 'bg-fuchsia-600 shadow-lg' : 'hover:bg-white/5 text-white/40'}`}>Calendario</button>
                         </div>
                     </header>
 
-                    <main className="px-8 max-w-6xl mx-auto">
+                    <main className="px-8 max-w-7xl mx-auto">
                         {view === 'dashboard' ? (
-                            <div className="space-y-8 animate-in fade-in duration-500">
-                                {/* Dashboard Stats */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <div className="glass p-8 rounded-[2.5rem] bg-gradient-to-br from-fuchsia-600/20 to-transparent">
-                                        <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">Gasto Total</p>
-                                        <h3 className="text-4xl font-black mt-2">${expenses.reduce((a,b) => a+b.amount, 0).toLocaleString()}</h3>
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
+                                
+                                <div className="lg:col-span-2 space-y-8">
+                                    {/* Stats */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="glass p-10 rounded-[2.5rem] bg-gradient-to-br from-fuchsia-600/10 to-transparent">
+                                            <p className="text-white/30 text-[10px] font-black uppercase tracking-widest">Total Gastado</p>
+                                            <h3 className="text-5xl font-black mt-3 tracking-tighter">${expenses.reduce((a,b) => a+b.amount, 0).toLocaleString()}</h3>
+                                        </div>
+                                        <div className="glass p-10 rounded-[2.5rem] bg-gradient-to-br from-indigo-600/10 to-transparent">
+                                            <p className="text-white/30 text-[10px] font-black uppercase tracking-widest">Deuda Cuotas</p>
+                                            <h3 className="text-5xl font-black mt-3 tracking-tighter">${expenses.filter(e => e.type === 'credito').reduce((a,b) => a+b.amount, 0).toLocaleString()}</h3>
+                                        </div>
                                     </div>
-                                    <div className="glass p-8 rounded-[2.5rem] bg-gradient-to-br from-indigo-600/20 to-transparent">
-                                        <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">Deuda Cuotas</p>
-                                        <h3 className="text-4xl font-black mt-2">${expenses.filter(e => e.type === 'credito').reduce((a,b) => a+b.amount, 0).toLocaleString()}</h3>
-                                    </div>
-                                    <div className="glass p-8 rounded-[2.5rem] bg-gradient-to-br from-emerald-600/20 to-transparent">
-                                        <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">Ahorro Activo</p>
-                                        <h3 className="text-4xl font-black mt-2">$0</h3>
+
+                                    {/* Nuevo Gasto */}
+                                    <div className="glass p-10 rounded-[3rem]">
+                                        <h2 className="text-2xl font-black mb-8 italic flex items-center gap-3">
+                                            <span className="w-8 h-8 bg-fuchsia-600 rounded-full flex items-center justify-center text-sm not-italic">+</span>
+                                            Registrar Gasto
+                                        </h2>
+                                        <form onSubmit={addExpense} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <input name="desc" placeholder="Descripción" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none focus:ring-2 ring-fuchsia-500" required />
+                                            <input name="amount" type="number" placeholder="Monto ($)" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none focus:ring-2 ring-fuchsia-500" required />
+                                            <select value={paymentType} onChange={(e) => setPaymentType(e.target.value)} className="w-full bg-[#1a0b2e] border border-white/10 p-5 rounded-2xl outline-none appearance-none cursor-pointer">
+                                                <option value="debito">Débito (Inmediato)</option>
+                                                <option value="credito">Crédito (Cuotas)</option>
+                                            </select>
+                                            {paymentType === 'credito' && (
+                                                <input name="installments" type="number" placeholder="¿Cuántas cuotas?" className="w-full bg-white/10 border border-fuchsia-500/40 p-5 rounded-2xl outline-none focus:ring-2 ring-fuchsia-500 animate-in slide-in-from-top-2" required />
+                                            )}
+                                            <button type="submit" className="md:col-span-2 bg-white text-black font-black py-5 rounded-2xl hover:bg-fuchsia-500 hover:text-white transition-all tracking-widest uppercase text-sm">Guardar Movimiento</button>
+                                        </form>
                                     </div>
                                 </div>
 
-                                {/* Formulario de Gastos */}
-                                <div className="glass p-10 rounded-[3rem]">
-                                    <h2 className="text-2xl font-black mb-6 italic text-fuchsia-500 underline decoration-indigo-500 underline-offset-8">Registrar Movimiento</h2>
-                                    <form onSubmit={addExpense} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <input name="desc" placeholder="Descripción (ej: Supermercado)" className="w-full bg-white/5 border border-white/10 p-4 rounded-xl outline-none focus:ring-2 ring-fuchsia-500" required />
-                                        <input name="amount" type="number" placeholder="Monto ($)" className="w-full bg-white/5 border border-white/10 p-4 rounded-xl outline-none focus:ring-2 ring-fuchsia-500" required />
-                                        <select value={paymentType} onChange={(e) => setPaymentType(e.target.value)} className="w-full bg-[#1a0b2e] border border-white/10 p-4 rounded-xl outline-none">
-                                            <option value="debito">Débito</option>
-                                            <option value="credito">Crédito</option>
-                                        </select>
-                                        {paymentType === 'credito' && (
-                                            <input name="installments" type="number" placeholder="N° de cuotas" className="w-full bg-white/10 border border-fuchsia-500/30 p-4 rounded-xl outline-none focus:ring-2 ring-fuchsia-500" required />
-                                        )}
-                                        <button type="submit" className="md:col-span-2 bg-white text-black font-black py-4 rounded-xl hover:bg-fuchsia-500 hover:text-white transition-all">GUARDAR TRANSACCIÓN</button>
-                                    </form>
+                                {/* Sidebar: Agenda de Ahorro */}
+                                <div className="space-y-8">
+                                    <div className="glass p-8 rounded-[2.5rem] border-t-4 border-fuchsia-600">
+                                        <h2 className="text-xl font-black mb-6 italic tracking-tight">Agenda de Ahorro</h2>
+                                        <div className="space-y-6 mb-8">
+                                            {savings.length === 0 && <p className="text-white/20 text-sm italic">Sin metas de ahorro aún.</p>}
+                                            {savings.map(goal => (
+                                                <div key={goal.id} className="group cursor-pointer">
+                                                    <div className="flex justify-between text-xs font-bold mb-2 uppercase tracking-wider">
+                                                        <span>{goal.name}</span>
+                                                        <span className="text-fuchsia-400">${goal.current.toLocaleString()} / ${goal.target.toLocaleString()}</span>
+                                                    </div>
+                                                    <div className="progress-bar">
+                                                        <div className="progress-fill" style={{ width: `${Math.min(100, (goal.current / goal.target) * 100)}%` }}></div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <form onSubmit={addSavingGoal} className="space-y-4">
+                                            <input name="name" placeholder="Nombre de la meta" className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-xs outline-none focus:ring-1 ring-fuchsia-500" required />
+                                            <input name="target" type="number" placeholder="Monto objetivo ($)" className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-xs outline-none focus:ring-1 ring-fuchsia-500" required />
+                                            <button type="submit" className="w-full py-3 border border-fuchsia-500/30 text-fuchsia-500 rounded-xl text-[10px] font-black uppercase hover:bg-fuchsia-500 hover:text-white transition-all">+ Crear Meta</button>
+                                        </form>
+                                    </div>
                                 </div>
+
                             </div>
                         ) : (
                             <div className="animate-in fade-in duration-500">
-                                <div className="glass rounded-[2.5rem] overflow-hidden">
+                                <div className="glass rounded-[3rem] overflow-hidden shadow-2xl">
                                     <div className="p-8 border-b border-white/10 flex justify-between items-center bg-white/5">
-                                        <h2 className="text-3xl font-black italic">Mi Agenda <span className="text-fuchsia-500">Financiera</span></h2>
+                                        <h2 className="text-3xl font-black italic tracking-tighter">Calendario de <span className="text-fuchsia-500">Vencimientos</span></h2>
                                     </div>
-                                    <div className="calendar-grid text-white/40 text-[10px] font-bold uppercase tracking-widest text-center">
-                                        {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map(d => <div key={d} className="p-4">{d}</div>)}
+                                    <div className="calendar-grid text-fuchsia-500/40 text-[9px] font-black uppercase tracking-[0.3em] text-center bg-[#1a0b2e]">
+                                        {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map(d => <div key={d} className="py-4 border-r border-white/5">{d}</div>)}
                                     </div>
-                                    <div className="calendar-grid">
+                                    <div className="calendar-grid border-t border-white/5">
                                         {Array.from({length: 35}).map((_, i) => {
-                                            const dayNum = i - 1; // Ajuste simple
+                                            const dayNum = i - 1; 
                                             const hasExp = expenses.filter(e => new Date(e.date).getDate() === dayNum);
                                             return (
-                                                <div key={i} className="calendar-day border-white/5">
+                                                <div key={i} className="calendar-day border-r border-b border-white/5 relative group">
                                                     {dayNum > 0 && dayNum <= 31 && (
                                                         <>
-                                                            <span className="text-sm font-bold opacity-30">{dayNum}</span>
+                                                            <span className="text-sm font-black opacity-20 group-hover:opacity-100 transition-opacity">{dayNum}</span>
                                                             <div className="mt-2 space-y-1">
                                                                 {hasExp.map((e, idx) => (
-                                                                    <div key={idx} className="bg-fuchsia-600 text-[8px] p-1 rounded font-bold truncate">
+                                                                    <div key={idx} className="bg-fuchsia-600/80 text-[7px] p-1 rounded font-black truncate shadow-lg">
                                                                         ${e.amount.toFixed(0)} - {e.desc}
                                                                     </div>
                                                                 ))}
@@ -153,7 +197,7 @@
                                         })}
                                     </div>
                                 </div>
-                                <button onClick={() => setView('dashboard')} className="mt-8 text-fuchsia-500 font-bold underline flex items-center gap-2">← Volver al Dashboard</button>
+                                <button onClick={() => setView('dashboard')} className="mt-10 text-white/40 font-bold text-xs uppercase tracking-widest hover:text-fuchsia-500 flex items-center gap-2 transition-all">← Volver al Dashboard</button>
                             </div>
                         )}
                     </main>
