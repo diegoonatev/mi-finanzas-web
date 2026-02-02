@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Economy Pro | Gestión Financiera</title>
+    <title>Economy Pro | Gestión Multi-Usuario</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -11,9 +11,11 @@
     <style>
         body { background-color: #020617; color: #f8fafc; font-family: 'Inter', sans-serif; }
         .glass { background: rgba(30, 41, 59, 0.5); backdrop-filter: blur(12px); border: 1px solid rgba(59, 130, 246, 0.2); }
-        .calendar-day { background: #0f172a; min-height: 100px; padding: 8px; border: 1px solid rgba(255,255,255,0.03); }
-        .calendar-day:hover { background: #1e293b; border-color: #3b82f6; }
-        .tab-active { background: #3b82f6; color: white; box-shadow: 0 0 15px rgba(59, 130, 246, 0.5); }
+        .calendar-day { background: #0f172a; min-height: 110px; padding: 8px; border: 1px solid rgba(255,255,255,0.03); transition: 0.2s; }
+        .calendar-day:hover { background: #1e293b; border-color: #3b82f6; cursor: pointer; }
+        .tab-active { background: #3b82f6; color: white; box-shadow: 0 0 15px rgba(59, 130, 246, 0.4); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
     </style>
 </head>
 <body>
@@ -24,16 +26,27 @@
 
         const App = () => {
             const [view, setView] = useState('dashboard');
-            const [user, setUser] = useState(localStorage.getItem('userName') || '');
-            const [movements, setMovements] = useState(JSON.parse(localStorage.getItem('movements')) || []);
-            const [savings, setSavings] = useState(JSON.parse(localStorage.getItem('savings')) || []);
-            const [type, setType] = useState('gasto'); // gasto o ingreso
+            const [user, setUser] = useState(localStorage.getItem('current_user') || '');
+            // Los movimientos se guardan por usuario: movements_nombre
+            const [movements, setMovements] = useState([]);
+            const [type, setType] = useState('gasto');
             const [method, setMethod] = useState('debito');
+            const [selectedDateDetails, setSelectedDateDetails] = useState(null);
 
+            // Cargar datos cuando el usuario cambia
             useEffect(() => {
-                localStorage.setItem('movements', JSON.stringify(movements));
-                localStorage.setItem('savings', JSON.stringify(savings));
-            }, [movements, savings]);
+                if (user) {
+                    const saved = localStorage.getItem(`movements_${user}`);
+                    setMovements(saved ? JSON.parse(saved) : []);
+                }
+            }, [user]);
+
+            // Guardar datos
+            useEffect(() => {
+                if (user) {
+                    localStorage.setItem(`movements_${user}`, JSON.stringify(movements));
+                }
+            }, [movements, user]);
 
             const addMovement = (e) => {
                 e.preventDefault();
@@ -41,15 +54,14 @@
                 const baseAmount = parseFloat(data.get('amount'));
                 const interest = parseFloat(data.get('interest') || 0);
                 const installments = method === 'credito' ? parseInt(data.get('installments')) : 1;
+                const userSelectedDate = new Date(data.get('date') + 'T12:00:00');
                 
-                // Cálculo de interés compuesto simple: Total = Base + (Base * %)
                 const totalWithInterest = baseAmount + (baseAmount * (interest / 100));
                 const amountPerInstallment = totalWithInterest / installments;
 
                 const newItems = Array.from({ length: installments }, (_, i) => {
-                    const date = new Date();
-                    // Si es crédito o gasto programado, el primer cobro es el mes que viene (i + 1)
-                    // Si es ingreso o débito, el cobro es hoy (i)
+                    const date = new Date(userSelectedDate);
+                    // Si es crédito, la primera cuota es el mes siguiente
                     const monthOffset = (method === 'credito') ? i + 1 : i;
                     date.setMonth(date.getMonth() + monthOffset);
 
@@ -69,6 +81,10 @@
                 setMethod('debito');
             };
 
+            const deleteMovement = (id) => {
+                setMovements(movements.filter(m => m.id !== id));
+            };
+
             const totalIncome = movements.filter(m => m.category === 'ingreso').reduce((a, b) => a + b.amount, 0);
             const totalExpense = movements.filter(m => m.category === 'gasto').reduce((a, b) => a + b.amount, 0);
             const balance = totalIncome - totalExpense;
@@ -76,13 +92,14 @@
             if (!user) {
                 return (
                     <div className="h-screen flex items-center justify-center bg-[#020617]">
-                        <div className="glass p-12 rounded-[2rem] text-center w-full max-w-sm">
-                            <h1 className="text-3xl font-bold mb-6 text-blue-400">ECONOMY<span className="text-white">PRO</span></h1>
-                            <input id="nameIn" type="text" placeholder="Tu nombre" className="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 mb-4 text-center outline-none focus:border-blue-500" />
+                        <div className="glass p-12 rounded-[2.5rem] text-center w-full max-w-sm shadow-2xl border-blue-500/20">
+                            <h1 className="text-3xl font-black mb-2 text-blue-400 italic">ECONOMY<span className="text-white">PRO</span></h1>
+                            <p className="text-slate-500 text-xs mb-8 font-bold uppercase tracking-widest">Gestión de Activos</p>
+                            <input id="nameIn" type="text" placeholder="Nombre de Usuario" className="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 mb-4 text-center outline-none focus:border-blue-500 text-white" />
                             <button onClick={() => {
-                                const v = document.getElementById('nameIn').value;
-                                if(v) { setUser(v); localStorage.setItem('userName', v); }
-                            }} className="w-full bg-blue-600 py-4 rounded-xl font-bold hover:bg-blue-500 transition-all">INGRESAR</button>
+                                const v = document.getElementById('nameIn').value.trim().toLowerCase();
+                                if(v) { setUser(v); localStorage.setItem('current_user', v); }
+                            }} className="w-full bg-blue-600 py-4 rounded-xl font-black hover:bg-blue-500 transition-all tracking-widest">INGRESAR</button>
                         </div>
                     </div>
                 );
@@ -90,114 +107,165 @@
 
             return (
                 <div className="min-h-screen">
-                    {/* Header */}
-                    <header className="p-6 md:p-10 flex flex-col md:flex-row justify-between items-center gap-6">
-                        <div className="text-center md:text-left">
-                            <h1 className="text-4xl font-black tracking-tight text-white italic">DASHBOARD</h1>
-                            <p className="text-blue-400 font-bold text-xs tracking-widest uppercase">Bienvenido, {user}</p>
+                    <header className="p-6 md:p-10 flex flex-col md:flex-row justify-between items-center gap-6 sticky top-0 bg-[#020617]/90 backdrop-blur-md z-40">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center font-black text-xl shadow-lg shadow-blue-500/20 italic">
+                                {user[0].toUpperCase()}
+                            </div>
+                            <div>
+                                <h1 className="text-2xl font-black text-white italic tracking-tighter uppercase">{view}</h1>
+                                <p className="text-blue-500 font-bold text-[10px] tracking-[0.2em] uppercase">Usuario: {user}</p>
+                            </div>
                         </div>
                         <div className="flex glass p-1.5 rounded-2xl">
-                            <button onClick={() => setView('dashboard')} className={`px-8 py-3 rounded-xl font-bold transition-all ${view === 'dashboard' ? 'tab-active' : 'text-slate-400'}`}>Resumen</button>
-                            <button onClick={() => setView('calendar')} className={`px-8 py-3 rounded-xl font-bold transition-all ${view === 'calendar' ? 'tab-active' : 'text-slate-400'}`}>Calendario</button>
+                            <button onClick={() => setView('dashboard')} className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all ${view === 'dashboard' ? 'tab-active' : 'text-slate-500 hover:text-white'}`}>RESUMEN</button>
+                            <button onClick={() => setView('calendar')} className={`px-6 py-2.5 rounded-xl font-bold text-xs transition-all ${view === 'calendar' ? 'tab-active' : 'text-slate-500 hover:text-white'}`}>CALENDARIO</button>
+                            <button onClick={() => { setUser(''); localStorage.removeItem('current_user'); }} className="px-4 py-2.5 text-slate-600 hover:text-rose-400 transition-colors text-xs font-bold">SALIR</button>
                         </div>
                     </header>
 
-                    <main className="px-6 md:px-10 max-w-7xl mx-auto space-y-10">
+                    <main className="px-6 md:px-10 max-w-7xl mx-auto space-y-10 pb-20">
                         {view === 'dashboard' ? (
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-700">
-                                {/* Stats */}
-                                <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <StatBox title="Balance Neto" value={`$${balance.toLocaleString()}`} color="text-blue-400" />
-                                    <StatBox title="Ingresos Totales" value={`$${totalIncome.toLocaleString()}`} color="text-emerald-400" />
-                                    <StatBox title="Gastos Totales" value={`$${totalExpense.toLocaleString()}`} color="text-rose-400" />
-                                    
-                                    {/* Formulario */}
-                                    <div className="md:col-span-3 glass p-10 rounded-[2.5rem]">
+                                <div className="lg:col-span-2 space-y-8">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <StatCard title="Saldo Disponible" value={`$${balance.toLocaleString()}`} color="text-blue-400" />
+                                        <StatCard title="Total Ingresos" value={`$${totalIncome.toLocaleString()}`} color="text-emerald-400" />
+                                        <StatCard title="Total Gastos" value={`$${totalExpense.toLocaleString()}`} color="text-rose-400" />
+                                    </div>
+
+                                    <div className="glass p-8 md:p-10 rounded-[2.5rem] border-l-4 border-blue-500">
                                         <div className="flex gap-4 mb-8">
-                                            <button onClick={() => setType('gasto')} className={`px-6 py-2 rounded-full text-xs font-bold border ${type === 'gasto' ? 'bg-rose-500 border-rose-500' : 'border-slate-700 text-slate-500'}`}>GASTO</button>
-                                            <button onClick={() => setType('ingreso')} className={`px-6 py-2 rounded-full text-xs font-bold border ${type === 'ingreso' ? 'bg-emerald-500 border-emerald-500' : 'border-slate-700 text-slate-500'}`}>INGRESO</button>
+                                            <button onClick={() => setType('gasto')} className={`px-8 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all ${type === 'gasto' ? 'bg-rose-600 text-white' : 'bg-slate-800 text-slate-500'}`}>GASTO</button>
+                                            <button onClick={() => setType('ingreso')} className={`px-8 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all ${type === 'ingreso' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-500'}`}>INGRESO</button>
                                         </div>
                                         
                                         <form onSubmit={addMovement} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            <input name="desc" placeholder="Descripción" className="w-full bg-slate-900/50 border border-slate-700 p-4 rounded-xl outline-none focus:border-blue-500" required />
-                                            <input name="amount" type="number" placeholder="Monto total ($)" className="w-full bg-slate-900/50 border border-slate-700 p-4 rounded-xl outline-none focus:border-blue-500" required />
-                                            
-                                            <select value={method} onChange={(e) => setMethod(e.target.value)} className="w-full bg-slate-900 border border-slate-700 p-4 rounded-xl outline-none">
-                                                <option value="debito">Débito / Efectivo</option>
-                                                <option value="credito">Tarjeta de Crédito</option>
-                                            </select>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase">Descripción</label>
+                                                <input name="desc" placeholder="Ej. Compra Supermercado" className="w-full bg-slate-900 border border-slate-700 p-4 rounded-xl outline-none focus:border-blue-500" required />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase">Fecha del Movimiento</label>
+                                                <input name="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full bg-slate-900 border border-slate-700 p-4 rounded-xl outline-none focus:border-blue-500 text-white" required />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase">Monto Total ($)</label>
+                                                <input name="amount" type="number" step="0.01" className="w-full bg-slate-900 border border-slate-700 p-4 rounded-xl outline-none focus:border-blue-500" required />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase">Método de Pago</label>
+                                                <select value={method} onChange={(e) => setMethod(e.target.value)} className="w-full bg-slate-900 border border-slate-700 p-4 rounded-xl outline-none appearance-none cursor-pointer">
+                                                    <option value="debito">Efectivo / Débito</option>
+                                                    <option value="credito">Tarjeta de Crédito</option>
+                                                </select>
+                                            </div>
 
                                             {method === 'credito' && (
-                                                <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
-                                                    <input name="installments" type="number" placeholder="Cuotas" className="w-full bg-slate-900 border border-slate-700 p-4 rounded-xl outline-none" required />
-                                                    <input name="interest" type="number" placeholder="Interés %" className="w-full bg-slate-900 border border-slate-700 p-4 rounded-xl outline-none" />
+                                                <div className="md:col-span-2 grid grid-cols-2 gap-6 animate-in slide-in-from-top-4">
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-bold text-blue-400 ml-1 uppercase">N° de Cuotas</label>
+                                                        <input name="installments" type="number" min="1" defaultValue="1" className="w-full bg-blue-900/10 border border-blue-500/30 p-4 rounded-xl outline-none" required />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-bold text-blue-400 ml-1 uppercase">Interés Anual (%)</label>
+                                                        <input name="interest" type="number" step="0.1" defaultValue="0" className="w-full bg-blue-900/10 border border-blue-500/30 p-4 rounded-xl outline-none" />
+                                                    </div>
                                                 </div>
                                             )}
                                             
-                                            <button type="submit" className={`md:col-span-2 py-5 rounded-xl font-black tracking-widest uppercase transition-all ${type === 'gasto' ? 'bg-rose-600 hover:bg-rose-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
-                                                Registrar {type}
+                                            <button type="submit" className={`md:col-span-2 py-5 rounded-xl font-black tracking-widest uppercase transition-all shadow-xl ${type === 'gasto' ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-900/20' : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/20'}`}>
+                                                REGISTRAR {type.toUpperCase()}
                                             </button>
                                         </form>
                                     </div>
                                 </div>
 
-                                {/* Movimientos Recientes */}
-                                <div className="glass p-8 rounded-[2.5rem]">
-                                    <h2 className="text-xl font-bold mb-6 italic">Movimientos Recientes</h2>
-                                    <div className="space-y-4">
-                                        {movements.slice(-6).reverse().map(m => (
-                                            <div key={m.id} className="flex justify-between items-center p-4 bg-slate-900/50 rounded-2xl border border-white/5">
-                                                <div>
-                                                    <p className="font-bold text-sm truncate w-32">{m.desc}</p>
-                                                    <p className="text-[10px] text-slate-500 uppercase">{m.date}</p>
+                                <div className="space-y-6">
+                                    <h2 className="text-sm font-black italic text-slate-400 tracking-widest uppercase ml-4">Actividad Reciente</h2>
+                                    <div className="space-y-3">
+                                        {movements.length === 0 && <p className="text-slate-600 italic text-sm ml-4">No hay datos registrados.</p>}
+                                        {movements.slice(-8).reverse().map(m => (
+                                            <div key={m.id} className="glass p-4 rounded-2xl border border-white/5 flex justify-between items-center group">
+                                                <div className="flex flex-col">
+                                                    <span className="font-bold text-xs truncate w-32 group-hover:text-blue-400 transition-colors">{m.desc}</span>
+                                                    <span className="text-[9px] text-slate-500 font-bold uppercase">{m.date}</span>
                                                 </div>
-                                                <span className={`font-black ${m.category === 'ingreso' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                    {m.category === 'ingreso' ? '+' : '-'}${m.amount.toLocaleString()}
-                                                </span>
+                                                <div className="flex flex-col items-end">
+                                                    <span className={`font-black text-sm ${m.category === 'ingreso' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                        {m.category === 'ingreso' ? '+' : '-'}${Math.round(m.amount).toLocaleString()}
+                                                    </span>
+                                                    <button onClick={() => deleteMovement(m.id)} className="text-[8px] text-slate-700 hover:text-rose-500 font-bold uppercase mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Eliminar</button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                             </div>
                         ) : (
-                            <div className="glass rounded-[3rem] overflow-hidden animate-in zoom-in-95 duration-500">
-                                <div className="p-10 border-b border-white/10 flex justify-between items-center bg-blue-900/10">
-                                    <h2 className="text-3xl font-black italic tracking-tighter uppercase">Calendario de Pagos</h2>
-                                </div>
-                                <div className="grid grid-cols-7 text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] text-center bg-slate-950/50">
-                                    {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map(d => <div key={d} className="p-6">{d}</div>)}
-                                </div>
-                                <div className="grid grid-cols-7 border-t border-white/5">
-                                    {Array.from({length: 35}).map((_, i) => {
-                                        const dayNum = i - 2; // Ajuste manual simple
-                                        const dayMovements = movements.filter(m => new Date(m.date).getDate() === dayNum && new Date(m.date).getMonth() === new Date().getMonth());
-                                        return (
-                                            <div key={i} className="calendar-day">
-                                                {dayNum > 0 && dayNum <= 31 && (
-                                                    <>
-                                                        <span className="text-xs font-bold text-slate-600">{dayNum}</span>
-                                                        <div className="mt-2 space-y-1">
-                                                            {dayMovements.map((m, idx) => (
-                                                                <div key={idx} className={`text-[8px] p-1 rounded font-bold truncate ${m.category === 'ingreso' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-600 text-white'}`}>
-                                                                    ${m.amount.toFixed(0)} {m.desc}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            </div>
+                            <CalendarView movements={movements} onDelete={deleteMovement} />
                         )}
                     </main>
+
+                    {/* Footer decorativo */}
+                    <div className="fixed bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-20"></div>
                 </div>
             );
         };
 
-        const StatBox = ({ title, value, color }) => (
-            <div className="glass p-8 rounded-[2rem] border-t-2 border-blue-500/30">
+        const CalendarView = ({ movements, onDelete }) => {
+            const [currDate, setCurrDate] = useState(new Date());
+            const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+            
+            const firstDay = new Date(currDate.getFullYear(), currDate.getMonth(), 1).getDay();
+            const daysInMonth = new Date(currDate.getFullYear(), currDate.getMonth() + 1, 0).getDate();
+            const calendarDays = [...Array(firstDay).fill(null), ...Array.from({length: daysInMonth}, (_, i) => i + 1)];
+
+            return (
+                <div className="glass rounded-[3rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500">
+                    <div className="p-8 md:p-12 border-b border-white/10 flex flex-col md:flex-row justify-between items-center bg-blue-900/5 gap-6">
+                        <h2 className="text-4xl font-black italic tracking-tighter uppercase">
+                            {monthNames[currDate.getMonth()]} <span className="text-blue-500">{currDate.getFullYear()}</span>
+                        </h2>
+                        <div className="flex gap-4">
+                            <button onClick={() => setCurrDate(new Date(currDate.setMonth(currDate.getMonth() - 1)))} className="p-4 glass rounded-2xl hover:bg-blue-600 transition-all">← Mes Anterior</button>
+                            <button onClick={() => setCurrDate(new Date(currDate.setMonth(currDate.getMonth() + 1)))} className="p-4 glass rounded-2xl hover:bg-blue-600 transition-all">Siguiente Mes →</button>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-7 text-[10px] font-black text-blue-500 uppercase tracking-[0.3em] text-center bg-slate-950/50">
+                        {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map(d => <div key={d} className="p-6 border-r border-white/5">{d}</div>)}
+                    </div>
+                    <div className="grid grid-cols-7 border-t border-white/5 bg-[#020617]">
+                        {calendarDays.map((d, i) => {
+                            const dateStr = `${currDate.getFullYear()}-${String(currDate.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                            const dayMovements = movements.filter(m => m.date === dateStr);
+                            const isToday = d === new Date().getDate() && currDate.getMonth() === new Date().getMonth() && currDate.getFullYear() === new Date().getFullYear();
+
+                            return (
+                                <div key={i} className={`calendar-day group relative ${!d ? 'bg-transparent border-none' : ''}`}>
+                                    {d && (
+                                        <>
+                                            <span className={`text-sm font-black transition-colors ${isToday ? 'text-blue-500' : 'text-slate-600 group-hover:text-white'}`}>{d}</span>
+                                            <div className="mt-2 space-y-1">
+                                                {dayMovements.map((m, idx) => (
+                                                    <div key={idx} className={`text-[8px] p-1.5 rounded-lg font-black truncate shadow-md flex justify-between items-center ${m.category === 'ingreso' ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30' : 'bg-blue-600 text-white'}`}>
+                                                        <span>${Math.round(m.amount)}</span>
+                                                        <button onClick={() => onDelete(m.id)} className="ml-1 opacity-0 group-hover:opacity-100 hover:text-rose-300">×</button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+            );
+        };
+
+        const StatCard = ({ title, value, color }) => (
+            <div className="glass p-8 rounded-[2rem] border-t-2 border-blue-500/20 hover:border-blue-500/50 transition-all">
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{title}</p>
                 <h3 className={`text-3xl font-black mt-2 tracking-tighter ${color}`}>{value}</h3>
             </div>
