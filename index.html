@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Economy | Pro Savings Edition</title>
+    <title>Economy Clarity | Versión Completa</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -11,11 +11,15 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap');
         body { background-color: #fcfcfc; color: #1a1a1a; font-family: 'Plus Jakarta Sans', sans-serif; }
-        .box-ui { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-        .btn-primary { background: #2563eb; color: white; border-radius: 12px; transition: all 0.3s; }
-        .input-ui { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; outline: none; }
+        .box-ui { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 20px; box-shadow: 0 4px 12px -2px rgba(0,0,0,0.03); }
+        .btn-primary { background: #2563eb; color: white; border-radius: 12px; transition: all 0.3s; font-weight: 700; }
+        .input-ui { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px 16px; outline: none; transition: all 0.2s; background: #fff; }
+        .input-ui:focus { border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.05); }
+        .calendar-day { min-height: 110px; border: 1px solid #f3f4f6; transition: 0.2s; position: relative; }
+        .calendar-day:hover { background: #f9fafb; }
+        .tab-active { background: #eff6ff; color: #2563eb; border: 1px solid #dbeafe; }
         .progress-bar { height: 8px; background: #f3f4f6; border-radius: 10px; overflow: hidden; }
-        .progress-fill { height: 100%; background: #2563eb; transition: width 0.6s ease; }
+        .progress-fill { height: 100%; transition: width 0.8s ease; }
     </style>
 </head>
 <body>
@@ -26,54 +30,20 @@
 
         const translations = {
             es: {
-                welcome: "Bienvenido,",
-                dashboard: "Resumen",
-                budget: "Presupuestos",
-                calendar: "Calendario",
-                logout: "Salir",
-                balance: "Disponible",
-                income: "Ingresos",
-                expense: "Gastos",
-                savings: "Ahorros",
-                add: "Registrar",
-                desc: "Descripción",
-                amount: "Monto",
-                date: "Fecha",
-                method: "Método",
-                installments: "Cuotas",
-                save: "Guardar",
-                edit: "Editar",
-                category: "Presupuesto",
-                limit: "Límite",
-                goal: "Meta de Ahorro",
-                goals: "Agenda de Ahorro",
-                newGoal: "Nueva Meta",
-                target: "Objetivo"
+                dashboard: "Resumen", budget: "Presupuestos", calendar: "Calendario", logout: "Salir",
+                balance: "Disponible", income: "Ingresos", expense: "Gastos", savings: "Ahorros",
+                add: "Registrar", desc: "Descripción", amount: "Monto", date: "Fecha", method: "Método",
+                inst: "Cuotas", int: "Interés %", save: "Guardar", edit: "Editar", cat: "Presupuesto",
+                limit: "Límite", goal: "Meta", goals: "Agenda de Ahorro", target: "Objetivo", 
+                del: "Borrar", next: "Sig", prev: "Ant"
             },
             en: {
-                welcome: "Welcome,",
-                dashboard: "Dashboard",
-                budget: "Budgets",
-                calendar: "Calendar",
-                logout: "Logout",
-                balance: "Available",
-                income: "Income",
-                expense: "Expenses",
-                savings: "Savings",
-                add: "Register",
-                desc: "Description",
-                amount: "Amount",
-                date: "Date",
-                method: "Method",
-                installments: "Installments",
-                save: "Save",
-                edit: "Edit",
-                category: "Budget",
-                limit: "Limit",
-                goal: "Savings Goal",
-                goals: "Savings Agenda",
-                newGoal: "New Goal",
-                target: "Target"
+                dashboard: "Overview", budget: "Budgets", calendar: "Schedule", logout: "Logout",
+                balance: "Balance", income: "Income", expense: "Expenses", savings: "Savings",
+                add: "Register", desc: "Description", amount: "Amount", date: "Date", method: "Method",
+                inst: "Installments", int: "Interest %", save: "Save", edit: "Edit", cat: "Budget",
+                limit: "Limit", goal: "Goal", goals: "Savings Agenda", target: "Target",
+                del: "Delete", next: "Next", prev: "Prev"
             }
         };
 
@@ -85,6 +55,7 @@
             const [budgets, setBudgets] = useState([]);
             const [goals, setGoals] = useState([]);
             const [type, setType] = useState('gasto');
+            const [editBud, setEditBud] = useState(null);
             const t = translations[lang];
 
             useEffect(() => {
@@ -103,40 +74,42 @@
                 }
             }, [movements, budgets, goals, user]);
 
-            const handleMovement = (e) => {
+            const handleAction = (e) => {
                 e.preventDefault();
-                const data = new FormData(e.target);
-                const amt = parseFloat(data.get('amount'));
-                const inst = data.get('method') === 'credito' ? parseInt(data.get('installments')) : 1;
-                const goalId = data.get('goalId');
+                const d = new FormData(e.target);
+                const base = parseFloat(d.get('amount'));
+                const interest = parseFloat(d.get('interest') || 0);
+                const method = d.get('method');
+                const installments = method === 'credito' ? parseInt(d.get('installments')) : 1;
+                const totalWithInt = base + (base * (interest / 100));
                 
-                const newItems = Array.from({ length: inst }, (_, i) => {
-                    const d = new Date(data.get('date') + 'T12:00:00');
-                    d.setMonth(d.getMonth() + (data.get('method') === 'credito' ? i + 1 : i));
+                const newItems = Array.from({ length: installments }, (_, i) => {
+                    const date = new Date(d.get('date') + 'T12:00:00');
+                    date.setMonth(date.getMonth() + (method === 'credito' ? i + 1 : i));
                     return {
                         id: Math.random().toString(36).substr(2, 9),
-                        desc: inst > 1 ? `${data.get('desc')} (${i+1}/${inst})` : data.get('desc'),
-                        amount: amt / inst,
-                        date: d.toISOString().split('T')[0],
+                        desc: installments > 1 ? `${d.get('desc')} (${i+1}/${installments})` : d.get('desc'),
+                        amount: totalWithInt / installments,
+                        date: date.toISOString().split('T')[0],
                         category: type,
-                        budgetId: data.get('budgetId') || null,
-                        goalRef: type === 'ahorro' ? goalId : null
+                        budgetId: d.get('budgetId'),
+                        goalId: d.get('goalId')
                     };
                 });
 
-                if (type === 'ahorro' && goalId) {
-                    setGoals(goals.map(g => g.id.toString() === goalId.toString() ? { ...g, current: g.current + amt } : g));
+                if (type === 'ahorro' && d.get('goalId')) {
+                    setGoals(goals.map(g => g.id.toString() === d.get('goalId') ? { ...g, current: g.current + base } : g));
                 }
-
                 setMovements([...movements, ...newItems]);
                 e.target.reset();
             };
 
-            const addGoal = (e) => {
+            const handleBudget = (e) => {
                 e.preventDefault();
-                const data = new FormData(e.target);
-                setGoals([...goals, { id: Date.now(), name: data.get('name'), target: parseFloat(data.get('target')), current: 0 }]);
-                e.target.reset();
+                const d = new FormData(e.target);
+                const nb = { id: Date.now(), name: d.get('name'), limit: parseFloat(d.get('limit')) };
+                editBud ? setBudgets(budgets.map(b => b.id === editBud.id ? nb : b)) : setBudgets([...budgets, nb]);
+                setEditBud(null); e.target.reset();
             };
 
             const stats = useMemo(() => {
@@ -145,114 +118,193 @@
                 return { inc, out, bal: inc - out };
             }, [movements]);
 
-            if (!user) {
-                return (
-                    <div className="h-screen flex items-center justify-center bg-white p-6">
-                        <div className="box-ui p-12 text-center w-full max-w-sm">
-                            <h1 className="text-2xl font-black text-blue-600 mb-8 italic uppercase tracking-tighter">Economy Clarity</h1>
-                            <input id="u" type="text" placeholder="Usuario" className="input-ui w-full mb-4 text-center" />
-                            <button onClick={() => { const v = document.getElementById('u').value.trim(); if(v) { setUser(v); localStorage.setItem('current_user', v); } }} className="btn-primary w-full py-4 font-bold uppercase tracking-widest text-xs">Entrar</button>
-                        </div>
+            if (!user) return (
+                <div className="h-screen flex items-center justify-center bg-gray-50 p-6">
+                    <div className="box-ui p-12 text-center w-full max-w-sm">
+                        <h1 className="text-2xl font-black text-blue-600 mb-8 uppercase italic tracking-tighter">Economy Clarity</h1>
+                        <input id="u" type="text" placeholder="Usuario" className="input-ui w-full mb-4 text-center" />
+                        <button onClick={() => { const v = document.getElementById('u').value.trim(); if(v) { setUser(v); localStorage.setItem('current_user', v); } }} className="btn-primary w-full py-4 text-xs uppercase tracking-widest">Entrar</button>
                     </div>
-                );
-            }
+                </div>
+            );
 
             return (
-                <div className="min-h-screen max-w-6xl mx-auto px-6 py-10">
-                    <header className="flex flex-col md:flex-row justify-between items-center mb-16 gap-6">
+                <div className="min-h-screen max-w-7xl mx-auto px-6 py-10">
+                    <header className="flex flex-col md:flex-row justify-between items-center mb-16 gap-8 sticky top-0 bg-[#fcfcfc]/90 backdrop-blur-md z-50 py-4">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center font-bold text-xl italic uppercase shadow-xl shadow-blue-100">{user[0]}</div>
+                            <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-100 italic uppercase">{user[0]}</div>
                             <div>
-                                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">{t.welcome}</p>
                                 <h1 className="text-2xl font-black capitalize italic">{user}</h1>
+                                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest leading-none">Global Control</p>
                             </div>
                         </div>
-                        <nav className="flex items-center gap-4 bg-white border border-gray-100 p-2 rounded-2xl shadow-sm text-[10px] font-black uppercase tracking-widest">
-                            <button onClick={() => setView('dashboard')} className={`px-4 py-2 rounded-xl ${view === 'dashboard' ? 'bg-blue-50 text-blue-600' : 'text-gray-400'}`}>{t.dashboard}</button>
-                            <button onClick={() => setView('budget')} className={`px-4 py-2 rounded-xl ${view === 'budget' ? 'bg-blue-50 text-blue-600' : 'text-gray-400'}`}>{t.budget}</button>
-                            <button onClick={() => setView('calendar')} className={`px-4 py-2 rounded-xl ${view === 'calendar' ? 'bg-blue-50 text-blue-600' : 'text-gray-400'}`}>{t.calendar}</button>
-                            <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="text-blue-600 border border-blue-50 px-2 py-1 rounded-lg">{lang.toUpperCase()}</button>
-                            <button onClick={() => { setUser(''); localStorage.removeItem('current_user'); }} className="text-red-400">{t.logout}</button>
+                        <nav className="flex items-center gap-2 bg-white border border-gray-100 p-2 rounded-2xl shadow-sm text-[10px] font-black uppercase tracking-widest overflow-x-auto w-full md:w-auto">
+                            <button onClick={() => setView('dashboard')} className={`px-4 py-2.5 rounded-xl whitespace-nowrap ${view === 'dashboard' ? 'tab-active' : 'text-gray-400'}`}>{t.dashboard}</button>
+                            <button onClick={() => setView('budget')} className={`px-4 py-2.5 rounded-xl whitespace-nowrap ${view === 'budget' ? 'tab-active' : 'text-gray-400'}`}>{t.budget}</button>
+                            <button onClick={() => setView('calendar')} className={`px-4 py-2.5 rounded-xl whitespace-nowrap ${view === 'calendar' ? 'tab-active' : 'text-gray-400'}`}>{t.calendar}</button>
+                            <button onClick={() => setLang(lang === 'es' ? 'en' : 'es')} className="px-3 py-2 text-blue-600 border border-blue-50 rounded-xl">{lang.toUpperCase()}</button>
+                            <button onClick={() => { setUser(''); localStorage.removeItem('current_user'); }} className="text-red-400 ml-2 px-2">{t.logout}</button>
                         </nav>
                     </header>
 
-                    <main>
+                    <main className="animate-in fade-in duration-500">
                         {view === 'dashboard' && (
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                                <div className="lg:col-span-2 space-y-10">
+                            <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
+                                <div className="lg:col-span-3 space-y-10">
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <StatCard title={t.balance} value={`$${stats.bal.toLocaleString()}`} color="text-blue-600" />
-                                        <StatCard title={t.income} value={`$${stats.inc.toLocaleString()}`} color="text-emerald-500" />
-                                        <StatCard title={t.expense} value={`$${stats.out.toLocaleString()}`} color="text-rose-500" />
+                                        <StatCard title={t.balance} value={`$${Math.round(stats.bal).toLocaleString()}`} color="text-blue-600" />
+                                        <StatCard title={t.income} value={`$${Math.round(stats.inc).toLocaleString()}`} color="text-emerald-500" />
+                                        <StatCard title={t.expense} value={`$${Math.round(stats.out).toLocaleString()}`} color="text-rose-500" />
                                     </div>
-
                                     <div className="box-ui p-10">
                                         <div className="flex gap-3 mb-10 overflow-x-auto pb-2">
                                             {['gasto', 'ingreso', 'ahorro'].map(x => (
-                                                <button key={x} onClick={() => setType(x)} className={`px-6 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest ${type === x ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-50 text-gray-400'}`}>{t[x === 'ahorro' ? 'savings' : x]}</button>
+                                                <button key={x} onClick={() => setType(x)} className={`px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${type === x ? 'bg-blue-600 text-white shadow-xl shadow-blue-100' : 'bg-gray-50 text-gray-400 hover:text-gray-600'}`}>{t[x === 'ahorro' ? 'savings' : x]}</button>
                                             ))}
                                         </div>
-                                        <form onSubmit={handleMovement} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <form onSubmit={handleAction} className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                             <input name="desc" placeholder={t.desc} className="input-ui" required />
                                             <input name="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} className="input-ui" required />
                                             <input name="amount" type="number" step="0.01" placeholder={t.amount} className="input-ui" required />
-                                            
+                                            <select name="method" className="input-ui bg-white text-gray-400">
+                                                <option value="debito">Débito / Cash</option>
+                                                <option value="credito">Crédito</option>
+                                            </select>
                                             {type === 'ahorro' ? (
                                                 <select name="goalId" className="input-ui bg-white text-gray-400" required>
-                                                    <option value="">Seleccionar Meta</option>
+                                                    <option value="">{t.goal}</option>
                                                     {goals.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                                                 </select>
                                             ) : (
                                                 <select name="budgetId" className="input-ui bg-white text-gray-400">
-                                                    <option value="">{t.category}</option>
+                                                    <option value="">{t.cat}</option>
                                                     {budgets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                                                 </select>
                                             )}
-
-                                            <select name="method" className="input-ui bg-white text-gray-400">
-                                                <option value="debito">Débito</option>
-                                                <option value="credito">Crédito</option>
-                                            </select>
-                                            <input name="installments" type="number" placeholder={t.installments} className="input-ui" />
-                                            
-                                            <button type="submit" className="btn-primary md:col-span-2 py-4 font-black uppercase text-xs tracking-[0.2em]">{t.save}</button>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <input name="installments" type="number" placeholder={t.inst} className="input-ui" />
+                                                <input name="interest" type="number" step="0.1" placeholder={t.int} className="input-ui" />
+                                            </div>
+                                            <button type="submit" className="btn-primary md:col-span-2 py-5 font-black uppercase text-xs tracking-widest">{t.add}</button>
                                         </form>
                                     </div>
                                 </div>
-
                                 <div className="space-y-10">
                                     <div className="box-ui p-8">
-                                        <h3 className="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-8 italic">{t.goals}</h3>
+                                        <h3 className="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-8">{t.goals}</h3>
                                         <div className="space-y-6 mb-10">
                                             {goals.map(g => (
-                                                <div key={g.id}>
+                                                <div key={g.id} className="group">
                                                     <div className="flex justify-between text-[10px] font-bold mb-2 uppercase">
                                                         <span>{g.name}</span>
                                                         <span className="text-blue-600">{Math.round((g.current/g.target)*100)}%</span>
                                                     </div>
-                                                    <div className="progress-bar"><div className="progress-fill" style={{ width: `${Math.min(100, (g.current/g.target)*100)}%` }}></div></div>
+                                                    <div className="progress-bar"><div className="progress-fill bg-blue-600" style={{ width: `${Math.min(100, (g.current/g.target)*100)}%` }}></div></div>
+                                                    <p className="text-[9px] text-gray-400 mt-2 font-bold">${Math.round(g.current).toLocaleString()} / ${g.target.toLocaleString()}</p>
                                                 </div>
                                             ))}
                                         </div>
-                                        <form onSubmit={addGoal} className="space-y-3">
+                                        <form onSubmit={(e) => { e.preventDefault(); const d = new FormData(e.target); setGoals([...goals, { id: Date.now(), name: d.get('name'), target: parseFloat(d.get('target')), current: 0 }]); e.target.reset(); }} className="space-y-3">
                                             <input name="name" placeholder={t.newGoal} className="input-ui w-full text-xs" required />
                                             <input name="target" type="number" placeholder={t.target} className="input-ui w-full text-xs" required />
-                                            <button type="submit" className="w-full py-3 border border-blue-100 text-blue-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-50 transition-all">+</button>
+                                            <button type="submit" className="w-full py-3 border border-blue-100 text-blue-600 rounded-xl text-[10px] font-black uppercase hover:bg-blue-50 transition-all">+</button>
                                         </form>
                                     </div>
                                 </div>
                             </div>
                         )}
-                        {/* El resto de las vistas (Presupuesto/Calendario) se mantienen igual en lógica visual */}
+
+                        {view === 'budget' && (
+                            <div className="space-y-12">
+                                <div className="box-ui p-10 max-w-2xl mx-auto">
+                                    <h2 className="text-xl font-black mb-8 italic">{editBud ? t.edit : t.add} {t.cat}</h2>
+                                    <form onSubmit={handleBudget} className="space-y-6">
+                                        <input name="name" defaultValue={editBud?.name} placeholder={t.desc} className="input-ui w-full" required />
+                                        <input name="limit" type="number" defaultValue={editBud?.limit} placeholder={t.limit} className="input-ui w-full" required />
+                                        <button type="submit" className="btn-primary w-full py-4 uppercase text-xs tracking-widest">{t.save}</button>
+                                    </form>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                    {budgets.map(b => {
+                                        const spent = movements.filter(m => m.budgetId === b.id.toString() && m.category === 'gasto').reduce((a,v)=>a+v.amount,0);
+                                        const pct = Math.min(100, (spent/b.limit)*100);
+                                        return (
+                                            <div key={b.id} className="box-ui p-8 space-y-5">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <h4 className="font-bold text-sm uppercase tracking-tight">{b.name}</h4>
+                                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">${Math.round(spent).toLocaleString()} / ${b.limit.toLocaleString()}</p>
+                                                    </div>
+                                                    <button onClick={() => setEditBud(b)} className="text-[10px] text-blue-600 font-black uppercase hover:underline">{t.edit}</button>
+                                                </div>
+                                                <div className="progress-bar">
+                                                    <div className={`progress-fill ${pct > 90 ? 'bg-rose-500' : pct > 70 ? 'bg-amber-400' : 'bg-blue-600'}`} style={{ width: `${pct}%` }}></div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'calendar' && (
+                            <CalendarView movements={movements} onDelete={(id) => setMovements(movements.filter(m=>m.id!==id))} t={t} />
+                        )}
                     </main>
                 </div>
             );
         };
 
+        const CalendarView = ({ movements, onDelete, t }) => {
+            const [curr, setCurr] = useState(new Date());
+            const first = new Date(curr.getFullYear(), curr.getMonth(), 1).getDay();
+            const daysCount = new Date(curr.getFullYear(), curr.getMonth() + 1, 0).getDate();
+            const days = [...Array(first).fill(null), ...Array.from({length: daysCount}, (_, i) => i + 1)];
+
+            return (
+                <div className="box-ui overflow-hidden shadow-2xl">
+                    <div className="p-10 border-b border-gray-100 flex justify-between items-center bg-gray-50/30">
+                        <h2 className="text-3xl font-black capitalize italic">{curr.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}</h2>
+                        <div className="flex gap-4">
+                            <button onClick={() => setCurr(new Date(curr.setMonth(curr.getMonth()-1)))} className="px-6 py-3 border border-gray-200 rounded-xl hover:bg-white text-[10px] font-black uppercase tracking-widest transition-all">{t.prev}</button>
+                            <button onClick={() => setCurr(new Date(curr.setMonth(curr.getMonth()+1)))} className="px-6 py-3 border border-gray-200 rounded-xl hover:bg-white text-[10px] font-black uppercase tracking-widest transition-all">{t.next}</button>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-7 border-b border-gray-100 bg-gray-50/20">
+                        {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map(d => <div key={d} className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">{d}</div>)}
+                    </div>
+                    <div className="grid grid-cols-7">
+                        {days.map((d, i) => {
+                            const ds = `${curr.getFullYear()}-${String(curr.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                            const ms = movements.filter(m => m.date === ds);
+                            const isToday = d === new Date().getDate() && curr.getMonth() === new Date().getMonth();
+                            return (
+                                <div key={i} className="calendar-day p-4 group">
+                                    {d && (
+                                        <>
+                                            <span className={`text-xs font-black ${isToday ? 'text-blue-600' : 'text-gray-300'}`}>{d}</span>
+                                            <div className="mt-3 space-y-1.5">
+                                                {ms.map((m, idx) => (
+                                                    <div key={idx} className={`text-[8px] p-2 rounded-lg font-black truncate shadow-sm flex justify-between items-center ${m.category === 'ingreso' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-600 text-white'}`}>
+                                                        <span>${Math.round(m.amount)} · {m.desc}</span>
+                                                        <button onClick={() => onDelete(m.id)} className="ml-1 opacity-0 group-hover:opacity-100 hover:text-red-300 transition-opacity">×</button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        };
+
         const StatCard = ({ title, value, color }) => (
-            <div className="box-ui p-8">
-                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2">{title}</p>
-                <h3 className={`text-2xl font-black tracking-tighter ${color}`}>{value}</h3>
+            <div className="box-ui p-8 transition-transform hover:-translate-y-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">{title}</p>
+                <h3 className={`text-3xl font-black tracking-tighter ${color}`}>{value}</h3>
             </div>
         );
 
